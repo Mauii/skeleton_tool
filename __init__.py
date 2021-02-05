@@ -19,13 +19,14 @@ import bpy
 import bmesh
 from bpy.props import (IntProperty, StringProperty)
 from jediacademy import *
+from mathutils.bvhtree import BVHTree
 
 
 # ADDON INFORMATION
 bl_info = {
     "name": "Skeleton Tool",
     "author": "Maui",
-    "version": (1, 2),
+    "version": (1, 3),
     "blender": (2, 91, 0),
     "location": "Object Properties -> Skeleton Tool Panel",
     "description": "This addon has multiple functions which drastingly decreases time spent in parenting of objects, tags and creating a .skin file.",
@@ -34,7 +35,7 @@ bl_info = {
 
 
 # BEGIN CLASSES
-class OBJECT_PT_skeleton_tool(bpy.types.Panel):
+class OBJECT_PT_SkeletonTool(bpy.types.Panel):
     """Creates a Panel in the Object properties window"""
     bl_label = "Skeleton Tool"
     bl_idname = "OBJECT_PT_skeleton_tool"
@@ -46,7 +47,7 @@ class OBJECT_PT_skeleton_tool(bpy.types.Panel):
         layout = self.layout
 
         obj = context.object
-        lods = context.scene.lods
+        settings = context.scene.settings
         
         row = layout.row()
         row.label(text="Skeleton Tool", icon='WORLD_DATA')
@@ -55,64 +56,38 @@ class OBJECT_PT_skeleton_tool(bpy.types.Panel):
         row.label(text="Please use the readme if these buttons aren't making sense to you.")
         
         box = layout.box()
-        box.operator("op.apply_all")
-        box.operator("object.set_armature")
-        
-        box = layout.box()
-        box.operator("object.create_tags")  
-        box.operator("object.set_g2")
-        box.operator("object.parent_objects")
-        box.operator("object.parent_tags")
-        
-        lodspresent = -1
-        
-        for obj in bpy.data.objects:
-            splitter = obj.name.split("_")
-            
-            if "model" not in obj.name.split("_")[0]:
-                continue
-            else:
-                lodspresent += 1
-            
-        if context.scene.lods.lod_level > lodspresent:
-            box.active = False
+        box.operator("object.create_tags")
+        box.operator("object.fix_tag_size")  
+        box.operator("object.parent_lod_level")
         
         box = layout.box()
         
-        box.operator("op.add_one")
-        box.operator("op.subtract_one")
-        box.label(text='Amount of LODs: ' + str(context.scene.lods.lod_level))
+        box.operator("object.add_one")
+        box.operator("object.subtract_one")
+        box.label(text='Current LOD level: ' + str(context.scene.settings.lod_level))
         
         box = layout.box()
         
-        box.prop(lods, "folder_path", text="Folder")
+        box.prop(settings, "folder_path", text="Folder")
         box.operator("file.create_skin")
         
 
-class OBJECT_OT_parent_objects(bpy.types.Operator):
+class OBJECT_OT_ParentLODLevel(bpy.types.Operator):
     """Parent all objects"""
-    bl_idname = "object.parent_objects"
-    bl_label = "Parent Objects"
+    bl_idname = "object.parent_lod_level"
+    bl_label = "Parent Objects/Tag"
 
     def execute(self, context):
         
-        ParentObjects(str(context.scene.lods.lod_level))
-        
-        return {'FINISHED'}
-    
-class OBJECT_OT_parent_tags(bpy.types.Operator):
-    """Parent all tags"""
-    bl_idname = "object.parent_tags"
-    bl_label = "Parent Tags"
-
-    def execute(self, context):
-        
-        ParentTags(str(context.scene.lods.lod_level))
+        ParentObjects(str(context.scene.settings.lod_level))
+        ParentTags(str(context.scene.settings.lod_level)) 
+        SetAllGhoul2Properties(str(context.scene.settings.lod_level)) 
+        SetArmature      
         
         return {'FINISHED'}
 
 
-class OBJECT_OT_create_tags(bpy.types.Operator):
+class OBJECT_OT_CreateTags(bpy.types.Operator):
     """Creates new Tags"""
     bl_idname = "object.create_tags"
     bl_label = "Create Tags"
@@ -120,88 +95,66 @@ class OBJECT_OT_create_tags(bpy.types.Operator):
     def execute(self, context):
         
         bpy.ops.outliner.orphans_purge()
-        CreateTags(str(context.scene.lods.lod_level))
-        SetUVMap()
+        CreateTags(str(context.scene.settings.lod_level))
 
         return {'FINISHED'}
 
     
-class OBJECT_OT_create_skinfile(bpy.types.Operator):
+class OBJECT_OT_CreateSkinfile(bpy.types.Operator):
     """Create model_default.skin file"""
     bl_idname = "file.create_skin"
     bl_label = "Create Skin"
 
     def execute(self, context):
-        CreateSkinFile(str(context.scene.lods.lod_level))
-
-        return {'FINISHED'}
-    
-class OBJECT_OT_set_g2_values(bpy.types.Operator):
-    """Set all object's g2 values"""
-    bl_idname = "object.set_g2"
-    bl_label = "Set G2 Values"
-
-    def execute(self, context):
-        SetG2Values(str(context.scene.lods.lod_level))
-
-        return {'FINISHED'}
-    
-class OBJECT_OT_set_armature(bpy.types.Operator):
-    """Add modifier Armature and assign skeleton_root"""
-    bl_idname = "object.set_armature"
-    bl_label = "Set Armature"
-
-    def execute(self, context):
-        exclude = ["scene_root", "skeleton_root", "model_root_0", "model_root_1", "model_root_2", "model_root_3"]
         
-        for obj in bpy.data.objects:
-            
-            if obj.name in exclude:
-                continue
-            
-            if not bpy.data.objects[obj.name].modifiers:
-                bpy.data.objects[obj.name].modifiers.new("skin", 'ARMATURE') # Add armature
-            
-            bpy.data.objects[obj.name].modifiers['skin'].object = bpy.data.objects["skeleton_root"] # Assign skeleton_root
-        else:
-            print("Assigned modifier 'armature', 'skeleton_root'.")
-            
-        return {'FINISHED'}    
+        CreateSkinFile()
+
+        return {'FINISHED'} 
 
 
 class OBJECT_OT_AddOne(bpy.types.Operator):
     """This adds 1 LOD level"""
-    bl_idname = "op.add_one"
-    bl_label = "LOD + 1"
+    bl_idname = "object.add_one"
+    bl_label = "LOD +1"
 
     def execute(self, context): 
-        if context.scene.lods.lod_level < 3:       
-            context.scene.lods.lod_level += 1
+        if context.scene.settings.lod_level < 3:       
+            context.scene.settings.lod_level += 1
         return {'FINISHED'}
     
     
 class OBJECT_OT_SubtractOne(bpy.types.Operator):
     """This subtracts 1 LOD level"""
-    bl_idname = "op.subtract_one"
-    bl_label = "LOD - 1"
+    bl_idname = "object.subtract_one"
+    bl_label = "LOD -1"
 
     def execute(self, context):   
-        if context.scene.lods.lod_level > 0:
-            context.scene.lods.lod_level -= 1
+        if context.scene.settings.lod_level > 0:
+            context.scene.settings.lod_level -= 1
         return {'FINISHED'}
     
 
-class OBJECT_OT_ApplyAll(bpy.types.Operator):
+class OBJECT_OT_TransformAll(bpy.types.Operator):
     """This applies all transforms to deltas"""
-    bl_idname = "op.apply_all"
+    bl_idname = "object.transform_all"
     bl_label = "Transform All"
 
     def execute(self, context):   
         TransformAll()
-        return {'FINISHED'}    
+        return {'FINISHED'}
+    
+    
+class OBJECT_OT_FixTagSize(bpy.types.Operator):
+    """This increases the Tag size to 10"""
+    bl_idname = "object.fix_tag_size"
+    bl_label = "Set Tag Size 10"
+
+    def execute(self, context):   
+        FixTagSize(str(context.scene.settings.lod_level))
+        return {'FINISHED'}        
     
         
-class LODSetter(bpy.types.PropertyGroup):
+class AddonProperties(bpy.types.PropertyGroup):
 
     lod_level: IntProperty(
         name="Setter for LOD",
@@ -219,58 +172,76 @@ class LODSetter(bpy.types.PropertyGroup):
 # END CLASSES
 
    
-# ALL FUNCTIONS BELOW            
-def SetUVMap():        
+# ALL FUNCTIONS BELOW
+
+# description: Every object needs to have an armature to be able to move, that's what I do.
+def SetArmature():
+    exclude = ["scene", "skeleton", "model"]
     
     for obj in bpy.data.objects:
         
-        if "*" not in obj.name:
+        if obj.name.split("_")[0] in exclude:
             continue
         
-        bpy.context.view_layer.objects.active = obj 
-        bpy.ops.object.mode_set(mode='EDIT')  
+        if bpy.data.objects[obj.name].modifiers:
+            continue
         
-        me = obj.data
-        bm = bmesh.from_edit_mesh(me)
+        if bpy.data.objects[obj.name].modifiers['skin'].object:
+            continue
+        
+        bpy.data.objects[obj.name].modifiers.new("skin", 'ARMATURE') # Add armature        
+        bpy.data.objects[obj.name].modifiers['skin'].object = bpy.data.objects["skeleton_root"] # Assign skeleton_root
+        
+    else:
+        
+        print("Assigned modifier 'armature', 'skeleton_root'.")
 
-        uv_layer = bm.loops.layers.uv.verify()
+# description: Every object needs weights, vertex groups obviously and uv mapping set. This includes tags, and that's where I'm for.            
+def SetUVMap(obj):        
+    
+    bpy.context.view_layer.objects.active = obj 
+    bpy.ops.object.mode_set(mode='EDIT')  
+    
+    me = obj.data
+    bm = bmesh.from_edit_mesh(me)
 
-        # adjust uv coordinates
-        for face in bm.faces:
-            for loop in face.loops:
-                loop_uv = loop[uv_layer]
-                # use xy position of the vertex as a uv coordinate
-                loop_uv.uv = loop.vert.co.xy
+    uv_layer = bm.loops.layers.uv.verify()
 
-        bmesh.update_edit_mesh(me)
-        bpy.ops.object.mode_set(mode='OBJECT') 
-        obj.select_set(False)
+    # adjust uv coordinates
+    for face in bm.faces:
+        for loop in face.loops:
+            loop_uv = loop[uv_layer]
+            # use xy position of the vertex as a uv coordinate
+            loop_uv.uv = loop.vert.co.xy
+
+    bmesh.update_edit_mesh(me)
+    bpy.ops.object.mode_set(mode='OBJECT') 
+    obj.select_set(False)
                 
-
-def SetG2Values(lod):
+                
+# description: This goes through every object and check whether they are a tag or an object and set Ghoul2 properties accordingly.
+def SetAllGhoul2Properties(lod):
     
     exclude = (
         "scene_root", 
-        "model_root_0", 
-        "model_root_1", 
-        "model_root_2", 
+        "model_root_" + lod,
         "skeleton_root"
     )
         
     for obj in bpy.data.objects:
             
-        if not "g2_prop_off" in obj:
+        if "g2_prop_off" not in obj:
             obj.g2_prop_off = False
-        if not "g2_prop_tag" in obj:
+        if "g2_prop_tag" not in obj:
             obj.g2_prop_tag = False
-        if not "g2_prop_name" in obj:
+        if "g2_prop_name" not in obj:
             obj.g2_prop_name = ""
-        if not "g2_prop_shader" in obj:
+        if "g2_prop_shader" not in obj:
             obj.g2_prop_shader = ""
           
         if obj.name in exclude:
             continue  
-          
+        
         if not obj.name.endswith(lod):
             continue
         
@@ -278,72 +249,100 @@ def SetG2Values(lod):
             obj.g2_prop_tag = True
    
         obj.g2_prop_name = obj.name.replace("_" + lod, "")
-
-
-def TransformAll():
-    for obj in bpy.data.objects:
-        obj.select_set(True) 
-        bpy.ops.object.transforms_to_deltas(mode='ALL')
-        obj.select_set(False)
     
-
+    
+# description: Goes through every object and check what kind of part it is and parent accordingly.
 def ParentObjects(lod):
 
     parts = {
-        "skeleton_root": "scene_root",
-        "model_root" : "scene_root",
-        "stupidtriangle_off" : "model_root_" + lod,
-        "hips": "stupidtriangle_off_" + lod,
-        "l_leg": "hips_" + lod,
-        "r_leg": "hips_" + lod,
-        "torso": "hips_" + lod,
-        "l_arm": "torso_" + lod,
-        "r_arm": "torso_" + lod,
-        "l_hand": "l_arm_" + lod,
-        "r_hand": "r_arm_" + lod,
-        "head": "torso_" + lod
+        "stupidtriangle_off_" + lod: "model_root_" + lod,
+        "hips_" + lod: "stupidtriangle_off_" + lod,
+        "l_leg_" + lod: "hips_" + lod,
+        "r_leg_" + lod: "hips_" + lod,
+        "torso_" + lod: "hips_" + lod,
+        "l_arm_" + lod: "torso_" + lod,
+        "r_arm_" + lod: "torso_" + lod,
+        "l_hand_" + lod: "l_arm_" + lod,
+        "r_hand_" + lod: "r_arm_" + lod,
+        "head_" + lod: "torso_" + lod
     }
     
     global splitter
     # Go through each and every object found in the hierarchy list
     for obj in bpy.data.objects:
-
-        bpy.ops.object.transforms_to_deltas(mode='ALL')
-
-        splitter = obj.name.split("_")
+       
+        splitter = obj.name.split("_") # Split name into an array of strings
         
-        if "*" in obj.name or "scene_root" in obj.name:
+        if "scene_root" in obj.name:
             continue
         
-        if "skeleton_root" in obj.name or "model" in splitter[0]:
+        if "skeleton" in splitter[0] or "model" in splitter[0]:
             obj.parent = bpy.data.objects["scene_root"]
-            continue  
+            continue
         
         if lod not in splitter:
             continue
-        
-        if obj.name.startswith("l_") or obj.name.startswith("r_"):
-            splitter = splitter[0] + "_" + splitter[1]
-            obj.parent = bpy.data.objects[parts[splitter]]
+                      
+        if "*" in obj.name:
             continue
         
-        if "off" in splitter[1]:
-            splitter = splitter[0] + "_" + splitter[1]
-            obj.parent = bpy.data.objects[parts[splitter]]
-            continue       
+        if obj.name.startswith("l_") or obj.name.startswith("r_") or "off" in splitter[1]:
+            splitter = splitter[0] + "_" + splitter[1] + "_" + lod  
+            try: # This is a debug print to see if the object's parent is present or not
+                obj.parent = bpy.data.objects[parts[splitter]]       
+            except:
+                print("Parent {} is not found, check names of your objects!".format(parts[splitter]))
+            continue
         
-        if len(splitter) >= 3:
-            print(str(splitter) + " | length: " + str(len(splitter)))
-            if lod not in splitter[1]:
-                print(str(splitter) + " | length: " + str(len(splitter)))
-                obj.parent = bpy.data.objects[splitter[0] + "_" + lod]
-                print(obj.name + " parent: " + obj.parent.name)
-                continue
+        splitter = splitter[0] + "_" + lod
         
-        obj.parent = bpy.data.objects[parts[splitter[0]]]
+        if splitter not in parts: # If naming convention is not followed, I will try to find which object I'm colliding with
+            for obj2 in bpy.data.objects:# Get the objects remaining objects
+                
+                if obj2 == obj or obj2.name.split("_")[0] in obj.name:
+                    continue
+                
+                if "*" in obj2:
+                    continue
+                
+                if lod not in obj2.name:
+                    continue
+                
+                if obj2.name.split("_")[0] in ["skeleton", "model", "scene"]:
+                    continue
+                
+                # Found the code underneath at: https://blender.stackexchange.com/questions/149891/python-in-blender-2-8-testing-if-two-objects-overlap-in-the-xy-plane/150014
+                # Adjusted a little bit so it would fit this addon
+                
+                # Get their world matrix
+                mat1 = obj.matrix_world
+                mat2 = obj2.matrix_world
+
+                # Get the geometry in world coordinates
+                vert1 = [mat1 @ v.co for v in obj.data.vertices] 
+                poly1 = [p.vertices for p in obj.data.polygons]
+
+                vert2 = [mat2 @ v.co for v in obj2.data.vertices] 
+                poly2 = [p.vertices for p in obj2.data.polygons]
+
+                # Create the BVH trees
+                bvh1 = BVHTree.FromPolygons(vert1, poly1)
+                bvh2 = BVHTree.FromPolygons(vert2, poly2)
+
+                # Test if overlap
+                if bvh1.overlap(bvh2):
+                    print("{} and {} overlap".format(obj.name, obj2.name))
+                    break
+         
+            obj.parent = bpy.data.objects[obj2.name]
+            continue
+        try: # This is a debug print to see if the object's parent is present or not
+            obj.parent = bpy.data.objects[parts[splitter]]       
+        except:
+            print("Parent {} is not found, check names of your objects!".format(parts[splitter]))
 
 def ParentTags(lod):
-
+    
     tagsparent = {
         "*back_" + lod: "torso_" + lod,
         "*chestg_" + lod: "torso_" + lod,
@@ -392,18 +391,17 @@ def ParentTags(lod):
         "*uchest_l_" + lod: "torso_" + lod,
         "*uchest_r_" + lod: "torso_" + lod
     }
-
-    for tag in bpy.data.objects:
-
-        if "*" not in tag.name:
+    
+    for obj in bpy.data.objects:
+    
+        if lod not in obj.name:
             continue
-        
-        if not tag.name.endswith(lod):
-            continue
-        
-        tag.parent = bpy.data.objects[tagsparent[tag.name]]
+                      
+        if "*" in obj.name:
+            obj.parent = bpy.data.objects[tagsparent[obj.name]]
 
 
+# description: This function checks if the to-be-made tag is already existing, if not then create it.
 def CreateTags(lod):
 
     tags = { # Every tagname 
@@ -553,48 +551,68 @@ def CreateTags(lod):
         [(-0.2497, -0.3752, 5.1751),(-0.3086, -0.3648, 5.1633),(-0.2798, -0.2377, 5.1314)]
     ]
 
-    edges = [] # Edges will be made automaticly, but had to define it
-    faces = [] # Same as edges, only this one will be used down below  
-    faces.append([0, 1, 2]) # Make sure faces will be made with 3 verts (triangles)    
+    edges = []
+    faces = [[0, 1, 2]] 
     
-    for number in range(45): # 45 tags
+    for number in range(46): # 46 tags
         
-        mesh = bpy.data.meshes.new(tags[number])
-        obj = bpy.data.objects.new(tags[number], mesh)
-        mesh.from_pydata(verts[number], edges, faces) # Create Tag
+        print("To be made: ", tags[number])
         
-        bpy.context.scene.collection.objects.link(obj) # Make the Tag visible
+        if tags[number] not in bpy.data.objects:
         
-        obj.vertex_groups.new(name=groups[obj.name]) # Adds a vertex group
-        obj.vertex_groups.active.add([0, 1, 2], 1.0, 'ADD') # Assign weight
-         
-        print("Tag " + obj.name + " created.")   
+            mesh = bpy.data.meshes.new(tags[number])
+            obj = bpy.data.objects.new(tags[number], mesh)
+            mesh.from_pydata(verts[number], edges, faces) # Create Tag
+            
+            bpy.context.scene.collection.objects.link(obj) # Make the Tag visible
+            
+            obj.vertex_groups.new(name=groups[obj.name]) # Adds a vertex group
+            obj.vertex_groups.active.add([0, 1, 2], 1.0, 'ADD') # Assign weight
+            
+            print(obj.name + " created.")  
+            
+            SetUVMap(obj) 
+            
+            
+def FixTagSize(lod):
+    for obj in bpy.data.objects:
+        if "*" not in obj.name:
+            continue
         
+        if lod not in obj.name:
+            continue
         
-def CreateSkinFile(lod):
-    file = open(bpy.context.scene.lods.folder_path + "\model_default.skin", "w")
-    
-    bpy.context.scene.lods.folder_path
+        print(obj.name, " being increased.")
+        
+        obj.scale[0] = 10
+        obj.scale[1] = 10
+        obj.scale[2] = 10
+        
+        bpy.ops.object.transforms_to_deltas(mode='ALL')
+        
+
+# description: After you've selected a path I will create model_default.skin for you.   
+def CreateSkinFile():
+    file = open(bpy.context.scene.settings.folder_path + "\model_default.skin", "w")
     
     exclude = (
         "scene_root", 
-        "model_root_0", 
-        "model_root_1", 
-        "model_root_2", 
+        "model_root_0",
+        "model_root_1",
+        "model_root_2",
+        "model_root_3",
         "stupidtriangle_off_0",
         "stupidtriangle_off_1",
         "stupidtriangle_off_2",
+        "stupidtriangle_off_3",
         "skeleton_root"
     )
     
     caps = ""
     
     for obj in bpy.data.objects:
-            
-        if not obj.name.endswith(lod):
-            continue
         
-        if "*" in obj.name:
+        if "*" in obj.name or "0" not in obj.name:
             continue   
         
         if obj.name in exclude:
@@ -604,8 +622,8 @@ def CreateSkinFile(lod):
             file.write(obj.g2_prop_name + ",*off\n")
             continue
                 
-        if "cap" in obj.name.split("_"):
-            caps = obj.g2_prop_name + "," + obj.active_material.name.split(".tga")[0] + ".tga\n"
+        if obj.g2_prop_off:
+            caps = caps + obj.g2_prop_name + "," + obj.active_material.name.split(".tga")[0] + ".tga\n"
             continue
                 
         file.write(obj.g2_prop_name + "," + obj.active_material.name.split(".tga")[0] + ".tga\n")    
@@ -618,28 +636,26 @@ def CreateSkinFile(lod):
 def register(): 
     for cls in classes:
         bpy.utils.register_class(cls)
-    bpy.types.Scene.lods = bpy.props.PointerProperty(type=LODSetter)
+    bpy.types.Scene.settings = bpy.props.PointerProperty(type=AddonProperties)
+   
    
 def unregister():
     for cls in classes:
         bpy.utils.unregister_class(cls)
-    del bpy.types.Scene.lods
+    del bpy.types.Scene.settings
 
-    # Current classes
+
 classes = [
-    OBJECT_PT_skeleton_tool,
-    OBJECT_OT_create_tags,
-    OBJECT_OT_parent_objects,
-    OBJECT_OT_parent_tags,
-    OBJECT_OT_create_skinfile,
-    OBJECT_OT_set_g2_values,
-    OBJECT_OT_set_armature,
+    OBJECT_PT_SkeletonTool,
+    OBJECT_OT_CreateTags,
+    OBJECT_OT_FixTagSize,
+    OBJECT_OT_ParentLODLevel,
+    OBJECT_OT_CreateSkinfile,
     OBJECT_OT_AddOne,
     OBJECT_OT_SubtractOne,
-    OBJECT_OT_ApplyAll,
-    LODSetter
+    AddonProperties
 ]
 
-# Not entirely sure what this means.. yet but it's mandatory
+
 if __name__ == "__main__":
     register()
