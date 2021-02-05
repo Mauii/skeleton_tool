@@ -81,8 +81,7 @@ class OBJECT_OT_ParentLODLevel(bpy.types.Operator):
         
         ParentObjects(str(context.scene.settings.lod_level))
         ParentTags(str(context.scene.settings.lod_level)) 
-        SetAllGhoul2Properties(str(context.scene.settings.lod_level)) 
-        SetArmature      
+        SetAllProperties(str(context.scene.settings.lod_level))       
         
         return {'FINISHED'}
 
@@ -173,29 +172,6 @@ class AddonProperties(bpy.types.PropertyGroup):
 
    
 # ALL FUNCTIONS BELOW
-
-# description: Every object needs to have an armature to be able to move, that's what I do.
-def SetArmature():
-    exclude = ["scene", "skeleton", "model"]
-    
-    for obj in bpy.data.objects:
-        
-        if obj.name.split("_")[0] in exclude:
-            continue
-        
-        if bpy.data.objects[obj.name].modifiers:
-            continue
-        
-        if bpy.data.objects[obj.name].modifiers['skin'].object:
-            continue
-        
-        bpy.data.objects[obj.name].modifiers.new("skin", 'ARMATURE') # Add armature        
-        bpy.data.objects[obj.name].modifiers['skin'].object = bpy.data.objects["skeleton_root"] # Assign skeleton_root
-        
-    else:
-        
-        print("Assigned modifier 'armature', 'skeleton_root'.")
-
 # description: Every object needs weights, vertex groups obviously and uv mapping set. This includes tags, and that's where I'm for.            
 def SetUVMap(obj):        
     
@@ -219,13 +195,13 @@ def SetUVMap(obj):
     obj.select_set(False)
                 
                 
-# description: This goes through every object and check whether they are a tag or an object and set Ghoul2 properties accordingly.
-def SetAllGhoul2Properties(lod):
+# description: This goes through every object, gives them an armature and check whether they are a tag or an object and set Ghoul2 properties accordingly.
+def SetAllProperties(lod):
     
     exclude = (
-        "scene_root", 
-        "model_root_" + lod,
-        "skeleton_root"
+        "scene", 
+        "model",
+        "skeleton"
     )
         
     for obj in bpy.data.objects:
@@ -238,9 +214,9 @@ def SetAllGhoul2Properties(lod):
             obj.g2_prop_name = ""
         if "g2_prop_shader" not in obj:
             obj.g2_prop_shader = ""
-          
-        if obj.name in exclude:
-            continue  
+    
+        if obj.name.split("_")[0] in exclude:
+            continue
         
         if not obj.name.endswith(lod):
             continue
@@ -249,6 +225,9 @@ def SetAllGhoul2Properties(lod):
             obj.g2_prop_tag = True
    
         obj.g2_prop_name = obj.name.replace("_" + lod, "")
+        
+        bpy.data.objects[obj.name].modifiers.new("skin", 'ARMATURE') # Add armature        
+        bpy.data.objects[obj.name].modifiers['skin'].object = bpy.data.objects["skeleton_root"] # Assign skeleton_root
     
     
 # description: Goes through every object and check what kind of part it is and parent accordingly.
