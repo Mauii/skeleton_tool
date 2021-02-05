@@ -226,9 +226,13 @@ def SetAllProperties(lod):
    
         obj.g2_prop_name = obj.name.replace("_" + lod, "")
         
-        bpy.data.objects[obj.name].modifiers.new("skin", 'ARMATURE') # Add armature        
-        bpy.data.objects[obj.name].modifiers['skin'].object = bpy.data.objects["skeleton_root"] # Assign skeleton_root
-    
+        try:
+            if obj.modifiers['skin']:
+                bpy.data.objects[obj.name].modifiers['skin'].object = bpy.data.objects["skeleton_root"] # Assign skeleton_root
+        except:
+            bpy.data.objects[obj.name].modifiers.new("skin", 'ARMATURE') # Add armature 
+            bpy.data.objects[obj.name].modifiers['skin'].object = bpy.data.objects["skeleton_root"] # Assign skeleton_root
+        
     
 # description: Goes through every object and check what kind of part it is and parent accordingly.
 def ParentObjects(lod):
