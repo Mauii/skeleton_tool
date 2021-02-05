@@ -75,7 +75,7 @@ class OBJECT_PT_SkeletonTool(bpy.types.Panel):
 class OBJECT_OT_ParentLODLevel(bpy.types.Operator):
     """Parent all objects"""
     bl_idname = "object.parent_lod_level"
-    bl_label = "Parent Objects/Tag"
+    bl_label = "Parent Objects/Tags"
 
     def execute(self, context):
         
