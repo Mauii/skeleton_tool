@@ -25,7 +25,7 @@ from mathutils.bvhtree import BVHTree
 bl_info = {
     "name": "Skeleton Tool",
     "author": "Maui",
-    "version": (1, 3),
+    "version": (1, 4),
     "blender": (2, 91, 0),
     "location": "Object Properties -> Skeleton Tool Panel",
     "description": "This addon has multiple functions which drastingly decreases time spent in parenting of objects, tags and creating a .skin file.",
