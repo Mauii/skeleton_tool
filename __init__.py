@@ -196,6 +196,7 @@ def GetParent(obj):
     lod = LastIndex(obj)   
 
     parts = {
+        "stupidtriangle_off": "model_root_" + lod,
         "hips": "stupidtriangle_off_" + lod,
         "l_leg": "hips_" + lod,
         "r_leg": "hips_" + lod,
@@ -204,7 +205,7 @@ def GetParent(obj):
         "r_arm": "torso_" + lod,
         "l_hand": "l_arm_" + lod,
         "r_hand": "r_arm_" + lod,
-        "head": "torso_" + lod
+        "head": "torso_" + lod,
     } 
     
     caps = {
@@ -216,7 +217,7 @@ def GetParent(obj):
         "r_arm": "r_arm_" + lod,
         "l_hand": "l_hand_" + lod,
         "r_hand": "r_hand_" + lod,
-        "head": "head_" + lod
+        "head": "head_" + lod,
     }
     
     tags = {
@@ -265,7 +266,7 @@ def GetParent(obj):
         "*torso_cap_l_arm_" + lod: "torso_" + lod,
         "*torso_cap_r_arm_" + lod: "torso_" + lod,
         "*uchest_l_" + lod: "torso_" + lod,
-        "*uchest_r_" + lod: "torso_" + lod
+        "*uchest_r_" + lod: "torso_" + lod,
     }
                       
     if "*" in obj.name:
@@ -282,11 +283,8 @@ def GetParent(obj):
         splitter = splitter[0] + "_" + splitter[1]
         return bpy.data.objects[parts[splitter]]
   
-    if "stupidtriangle" in obj.name or "stupidtriangle_off" in obj.name:
+    if "stupidtriangle_off" in obj.name or "stupidtriangle" in obj.name:
         return bpy.data.objects["model_root_" + lod]        
-    
-    if "stupidtriangle_off" not in bpy.data.objects and "hips" in splitter:
-        return bpy.data.objects["stupidtriangle_" + lod]
           
     print(splitter)
     print(obj.name)
@@ -317,12 +315,21 @@ def CreateSkinFile():
     caps = ""
     
     for obj in bpy.data.objects:
-        
+                
         if "*" in obj.name or "0" not in obj.name or obj.name in exclude:
             continue   
                 
         if obj.g2_prop_off and "cap" in obj.name:
+            
+            if "Material" in obj.active_material.name.split("."):
+                caps = caps + obj.g2_prop_name + ",*off\n"
+                continue
+            
             caps = caps + obj.g2_prop_name + "," + obj.active_material.name.split(".tga")[0] + ".tga\n"
+            continue
+        
+        if "Material" in obj.active_material.name:
+            file.write(obj.g2_prop_name + ",*off\n")
             continue
                 
         file.write(obj.g2_prop_name + "," + obj.active_material.name.split(".tga")[0] + ".tga\n")  
