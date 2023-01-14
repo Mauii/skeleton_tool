@@ -23,11 +23,11 @@ Example: My skeleton has an object named helmet. If I don't rename helmet to hea
 After parenting everything, it will set the Ghoul2 Name of the objects.
 
 =======================================================================================================================================================================
-Folder |textbox| Folder icon (pressable): When this button is selected, you have to navigate to the folder where you want the model_default.skin to be created.
+Folder |textbox| Folder icon (pressable): When this button is pressed, you have to navigate to the folder where you want the model_default.skin to be created.
 =======================================================================================================================================================================
 
 =======================================================================================================================================================================
-Create Skin File: When this button is selected, the addon creates a model_default.skin file and places it on the earlier determined folder, which otherwise would be created 
+Create Skin File: When this button is pressed, the addon creates a model_default.skin file and places it on the earlier determined folder, which otherwise would be created 
 manually. This will use caps aswell.
 =======================================================================================================================================================================
 
