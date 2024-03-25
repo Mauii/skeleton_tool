@@ -52,7 +52,9 @@ class OBJECT_PT_SkeletonTool(bpy.types.Panel):
         row.label(text="Skeleton Tool", icon='WORLD_DATA')
         
         box = layout.box() 
-        box.operator("object.parent") 
+        box.operator("body.parent") 
+        box.operator("cap.parent") 
+        box.operator("tag.parent") 
         box.operator("object.clean")
         
         box = layout.box()        
@@ -60,33 +62,65 @@ class OBJECT_PT_SkeletonTool(bpy.types.Panel):
         box.operator("file.create_skin")
         
 
-class OBJECT_OT_Parent(bpy.types.Operator):
-    """Parent all objects"""
-    bl_idname = "object.parent"
-    bl_label = "Parent Objects/Tags"
+class OBJECT_OT_BodyParent(bpy.types.Operator):
+    """Parent all objects and tags"""
+    bl_idname = "body.parent"
+    bl_label = "Parent Body Parts"
 
     def execute(self, context):
         
         for obj in bpy.data.objects:
             
-            lod = LastIndex(obj)
+            lod = LastIndex(obj)        
             
-            if "scene_root" in obj.name:
-                continue
-          
-            if "skeleton_root" in obj.name or "model_root_" + lod in obj.name:
-                obj.parent = bpy.data.objects["scene_root"]
+            if "_cap_" in obj.name or "*" in obj.name or "scene_root" in obj.name or "model_root" in obj.name or "skeleton" in obj.name:
                 continue
             
-            obj.parent = GetParent(obj)
+            setParent(obj, GetBodyParent(obj, lod))
         
         return {'FINISHED'}
     
+class OBJECT_OT_CapParent(bpy.types.Operator):
+    """Parent all caps"""
+    bl_idname = "cap.parent"
+    bl_label = "Parent Caps"
+
+    def execute(self, context):
+        
+        for obj in bpy.data.objects:
+            
+            lod = LastIndex(obj) 
+            
+            if "_cap_" not in obj.name:
+                continue
+                
+            setParent(obj, GetCapParent(obj, lod))
+                 
+            
+        return {'FINISHED'}    
+
+class OBJECT_OT_TagParent(bpy.types.Operator):
+    """Parent all tags"""
+    bl_idname = "tag.parent"
+    bl_label = "Parent Tags"
+
+    def execute(self, context):
+        
+        for obj in bpy.data.objects:
+            
+            lod = LastIndex(obj)  
+        
+            if "*" not in obj.name:
+                continue
+            
+            setParent(obj, GetTapParent(obj, lod))
+        
+        return {'FINISHED'}  
     
 class OBJECT_OT_Clean(bpy.types.Operator):
-    """Clean up copies"""
-    bl_idname = "object.clean"
-    bl_label = "Clean Hierarchy"
+    """Delete duplicate in hierarchy"""
+    bl_idname = "hierarchy.clean"
+    bl_label = "Clean duplicates in hierarchy"
 
     def execute(self, context):
         
@@ -110,37 +144,9 @@ class OBJECT_OT_CreateSkinfile(bpy.types.Operator):
         CreateSkinFile()
 
         return {'FINISHED'} 
-
-
-class OBJECT_OT_AddOne(bpy.types.Operator):
-    """This adds 1 LOD level"""
-    bl_idname = "object.add_one"
-    bl_label = "LOD +1"
-
-    def execute(self, context): 
-        if context.scene.settings.lod_level < 3:       
-            context.scene.settings.lod_level += 1
-        return {'FINISHED'}
-    
-    
-class OBJECT_OT_SubtractOne(bpy.types.Operator):
-    """This subtracts 1 LOD level"""
-    bl_idname = "object.subtract_one"
-    bl_label = "LOD -1"
-
-    def execute(self, context):   
-        if context.scene.settings.lod_level > 0:
-            context.scene.settings.lod_level -= 1
-        return {'FINISHED'}       
     
         
 class AddonProperties(bpy.types.PropertyGroup):
-
-    lod_level: IntProperty(
-        name="Setter for LOD",
-        description="This number determines which LOD to use.",
-        default = 0
-        )
         
     folder_path: StringProperty(
         name="Folder",
@@ -182,43 +188,15 @@ def SetGhoul2Name():
         obj.g2_prop_name = obj.name.replace("_" + lod, "")
 
 
-def LastIndex(modelpart):
+def LastIndex(obj):
     
-    modelpart = modelpart.name.split("_")
+    object = obj.name.split("_")
     
-    for index in modelpart:
+    for index in object:
         if index.isnumeric():
             return index    
-
     
-def GetParent(obj):
-
-    lod = LastIndex(obj)   
-
-    parts = {
-        "stupidtriangle_off": "model_root_" + lod,
-        "hips": "stupidtriangle_off_" + lod,
-        "l_leg": "hips_" + lod,
-        "r_leg": "hips_" + lod,
-        "torso": "hips_" + lod,
-        "l_arm": "torso_" + lod,
-        "r_arm": "torso_" + lod,
-        "l_hand": "l_arm_" + lod,
-        "r_hand": "r_arm_" + lod,
-        "head": "torso_" + lod,
-    } 
-    
-    caps = {
-        "hips": "hips_" + lod,
-        "l_leg": "l_leg_" + lod,
-        "r_leg": "r_leg_" + lod,
-        "torso": "torso_" + lod,
-        "l_arm": "l_arm_" + lod,
-        "r_arm": "r_arm_" + lod,
-        "l_hand": "l_hand_" + lod,
-        "r_hand": "r_hand_" + lod,
-        "head": "head_" + lod,
-    }
+def GetTagParent(obj, lod):
     
     tags = {
         "*back_" + lod: "torso_" + lod,
@@ -268,28 +246,60 @@ def GetParent(obj):
         "*uchest_l_" + lod: "torso_" + lod,
         "*uchest_r_" + lod: "torso_" + lod,
     }
-                      
-    if "*" in obj.name:
-        return bpy.data.objects[tags[obj.name]]        
-  
-    splitter = obj.name.split("_") # Split name into an array of strings 
-  
-    if obj.name.startswith("l_") or obj.name.startswith("r_"):
-         
-        if "cap" in splitter:
-            splitter = splitter[0] + "_" + splitter[1]
-            return bpy.data.objects[caps[splitter]]
-        
-        splitter = splitter[0] + "_" + splitter[1]
-        return bpy.data.objects[parts[splitter]]
-  
-    if "stupidtriangle_off" in obj.name or "stupidtriangle" in obj.name:
-        return bpy.data.objects["model_root_" + lod]        
-          
-    print(splitter)
-    print(obj.name)
     
-    return bpy.data.objects[parts[splitter[0]]]
+    if "*" in obj.name:
+        return bpy.data.objects[tags[obj.name]]
+    
+def GetCapParent(obj, lod):
+    
+     caps = {
+        "l_leg": "l_leg_" + lod,
+        "r_leg": "r_leg_" + lod,
+        "l_arm": "l_arm_" + lod,
+        "r_arm": "r_arm_" + lod,
+        "l_hand": "l_hand_" + lod,
+        "r_hand": "r_hand_" + lod,
+        "head": "head_" + lod,
+        "torso": "torso_" + lod,
+        "hips": "hips_" + lod,
+    }
+    
+    splitter = obj.name.split("_")
+        
+    if obj.name.startswith("l_") or obj.name.startswith("r_"): # Determine: left or right
+
+        splitter = splitter[0] + "_" + splitter[1]
+        return bpy.data.objects[caps[splitter]]
+    
+    return bpy.data.objects[caps[splitter[0]]   
+    
+def GetBodyParent(obj, lod):           
+
+    parts = {
+        "stupidtriangle_off": "model_root_" + lod,
+        "hips": "stupidtriangle_off_" + lod,
+        "l_leg": "hips_" + lod,
+        "r_leg": "hips_" + lod,
+        "torso": "hips_" + lod,
+        "l_arm": "torso_" + lod,
+        "r_arm": "torso_" + lod,
+        "l_hand": "l_arm_" + lod,
+        "r_hand": "r_arm_" + lod,
+        "head": "torso_" + lod,
+    } 
+    
+    splitter = obj.name.split("_")     
+  
+    if "skeleton_root" in obj.name or "model_root" in obj.name:
+        return bpy.data.objects("scene_root")
+  
+    if obj.name.startswith("l_") or obj.name.startswith("r_") or "stupidtriangle" in obj.name: # Determine: object arm or leg     
+        splitter = splitter[0] + "_" + splitter[1]
+        
+    return bpy.data.objects[parts[splitter]]
+
+def setParent(obj, parentTo):
+    obj.parent = parentTo
 
 # description: After you've selected a path I will create model_default.skin for you.   
 def CreateSkinFile():
@@ -354,11 +364,11 @@ def unregister():
 
 classes = [
     OBJECT_PT_SkeletonTool,
-    OBJECT_OT_Parent,
+    OBJECT_OT_BodyParent,
+    OBJECT_OT_CapParent,
+    OBJECT_OT_TagParent,
     OBJECT_OT_Clean,
     OBJECT_OT_CreateSkinfile,
-    OBJECT_OT_AddOne,
-    OBJECT_OT_SubtractOne,
     AddonProperties
 ]
 
