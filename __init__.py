@@ -70,13 +70,16 @@ class OBJECT_OT_BodyParent(bpy.types.Operator):
     def execute(self, context):
         
         for obj in bpy.data.objects:
-            
+
             lod = LastIndex(obj)        
             
-            if "_cap_" in obj.name or "*" in obj.name or "scene_root" in obj.name or "model_root" in obj.name or "skeleton" in obj.name:
+            if "_cap_" in obj.name or "*" in obj.name or "scene_root" in obj.name:
                 continue
             
-            setParent(obj, GetBodyParent(obj, lod))
+            if GetBodyParent(obj, lod) == None:
+                continue
+            
+            obj.parent = GetBodyParent(obj, lod)
         
         return {'FINISHED'}
     
@@ -94,7 +97,7 @@ class OBJECT_OT_CapParent(bpy.types.Operator):
             if "_cap_" not in obj.name:
                 continue
                 
-            setParent(obj, GetCapParent(obj, lod))
+            obj.parent = GetCapParent(obj, lod)
                  
             
         return {'FINISHED'}    
@@ -113,7 +116,7 @@ class OBJECT_OT_TagParent(bpy.types.Operator):
             if "*" not in obj.name:
                 continue
             
-            setParent(obj, GetTapParent(obj, lod))
+            obj.parent = GetTagParent(obj, lod)
         
         return {'FINISHED'}  
     
@@ -185,7 +188,7 @@ def SetGhoul2Name():
         if obj.name.split("_")[0] in exclude or "*" in obj.name:
             continue
    
-        obj.g2_prop_name = obj.name.replace("_" + lod, "")
+        obj.g2_prop_name = obj.name.replace("_" + str(lod), "")
 
 
 def LastIndex(obj):
@@ -199,52 +202,52 @@ def LastIndex(obj):
 def GetTagParent(obj, lod):
     
     tags = {
-        "*back_" + lod: "torso_" + lod,
-        "*chestg_" + lod: "torso_" + lod,
-        "*head_back_" + lod: "head_" + lod,
-        "*head_cap_torso_" + lod: "head_" + lod,
-        "*head_eyes_" + lod: "head_" + lod,
-        "*head_front_" + lod: "head_" + lod,
-        "*head_left_" + lod: "head_" + lod,
-        "*head_right_" + lod: "head_" + lod,
-        "*head_top_" + lod: "head_" + lod,
-        "*hip_bl_" + lod: "hips_" + lod,
-        "*hip_br_" + lod: "hips_" + lod,
-        "*hip_fl_" + lod: "hips_" + lod,
-        "*hip_fr_" + lod: "hips_" + lod,
-        "*hip_l_" + lod: "hips_" + lod,
-        "*hip_r_" + lod: "hips_" + lod,
-        "*hips_cap_l_leg_" + lod: "hips_" + lod,
-        "*hips_cap_r_leg_" + lod: "hips_" + lod,
-        "*hips_cap_torso_" + lod: "hips_" + lod,
-        "*hips_l_knee_" + lod: "hips_" + lod,
-        "*hips_r_knee_" + lod: "hips_" + lod,
-        "*l_arm_cap_l_hand_" + lod: "l_arm_" + lod,
-        "*l_arm_cap_torso_" + lod: "l_arm_" + lod,
-        "*l_arm_elbow_" + lod: "l_arm_" + lod,
-        "*l_hand_" + lod: "l_hand_" + lod,
-        "*l_hand_cap_l_arm_" + lod: "l_hand_" + lod,
-        "*l_leg_calf_" + lod: "l_leg_" + lod,
-        "*l_leg_cap_hips_" + lod: "l_leg_" + lod,
-        "*l_leg_foot_" + lod: "l_leg_" + lod,
-        "*lchest_l_" + lod: "torso_" + lod,
-        "*lchest_r_" + lod: "torso_" + lod,
-        "*r_arm_cap_r_hand_" + lod: "r_arm_" + lod,
-        "*r_arm_cap_torso_" + lod: "r_arm_" + lod,
-        "*r_arm_elbow_" + lod: "r_arm_" + lod,
-        "*r_hand_" + lod: "r_hand_" + lod,
-        "*r_hand_cap_r_arm_" + lod: "r_hand_" + lod,
-        "*r_leg_calf_" + lod: "r_leg_" + lod,
-        "*r_leg_cap_hips_" + lod: "r_leg_" + lod,
-        "*r_leg_foot_" + lod: "r_leg_" + lod,
-        "*shldr_l_" + lod: "torso_" + lod,
-        "*shldr_r_" + lod: "torso_" + lod,
-        "*torso_cap_head_" + lod: "torso_" + lod,
-        "*torso_cap_hips_" + lod: "torso_" + lod,
-        "*torso_cap_l_arm_" + lod: "torso_" + lod,
-        "*torso_cap_r_arm_" + lod: "torso_" + lod,
-        "*uchest_l_" + lod: "torso_" + lod,
-        "*uchest_r_" + lod: "torso_" + lod,
+        "*back_" + str(lod): "torso_" + str(lod),
+        "*chestg_" + str(lod): "torso_" + str(lod),
+        "*head_back_" + str(lod): "head_" + str(lod),
+        "*head_cap_torso_" + str(lod): "head_" + str(lod),
+        "*head_eyes_" + str(lod): "head_" + str(lod),
+        "*head_front_" + str(lod): "head_" + str(lod),
+        "*head_left_" + str(lod): "head_" + str(lod),
+        "*head_right_" + str(lod): "head_" + str(lod),
+        "*head_top_" + str(lod): "head_" + str(lod),
+        "*hip_bl_" + str(lod): "hips_" + str(lod),
+        "*hip_br_" + str(lod): "hips_" + str(lod),
+        "*hip_fl_" + str(lod): "hips_" + str(lod),
+        "*hip_fr_" + str(lod): "hips_" + str(lod),
+        "*hip_l_" + str(lod): "hips_" + str(lod),
+        "*hip_r_" + str(lod): "hips_" + str(lod),
+        "*hips_cap_l_leg_" + str(lod): "hips_" + str(lod),
+        "*hips_cap_r_leg_" + str(lod): "hips_" + str(lod),
+        "*hips_cap_torso_" + str(lod): "hips_" + str(lod),
+        "*hips_l_knee_" + str(lod): "hips_" + str(lod),
+        "*hips_r_knee_" + str(lod): "hips_" + str(lod),
+        "*l_arm_cap_l_hand_" + str(lod): "l_arm_" + str(lod),
+        "*l_arm_cap_torso_" + str(lod): "l_arm_" + str(lod),
+        "*l_arm_elbow_" + str(lod): "l_arm_" + str(lod),
+        "*l_hand_" + str(lod): "l_hand_" + str(lod),
+        "*l_hand_cap_l_arm_" + str(lod): "l_hand_" + str(lod),
+        "*l_leg_calf_" + str(lod): "l_leg_" + str(lod),
+        "*l_leg_cap_hips_" + str(lod): "l_leg_" + str(lod),
+        "*l_leg_foot_" + str(lod): "l_leg_" + str(lod),
+        "*lchest_l_" + str(lod): "torso_" + str(lod),
+        "*lchest_r_" + str(lod): "torso_" + str(lod),
+        "*r_arm_cap_r_hand_" + str(lod): "r_arm_" + str(lod),
+        "*r_arm_cap_torso_" + str(lod): "r_arm_" + str(lod),
+        "*r_arm_elbow_" + str(lod): "r_arm_" + str(lod),
+        "*r_hand_" + str(lod): "r_hand_" + str(lod),
+        "*r_hand_cap_r_arm_" + str(lod): "r_hand_" + str(lod),
+        "*r_leg_calf_" + str(lod): "r_leg_" + str(lod),
+        "*r_leg_cap_hips_" + str(lod): "r_leg_" + str(lod),
+        "*r_leg_foot_" + str(lod): "r_leg_" + str(lod),
+        "*shldr_l_" + str(lod): "torso_" + str(lod),
+        "*shldr_r_" + str(lod): "torso_" + str(lod),
+        "*torso_cap_head_" + str(lod): "torso_" + str(lod),
+        "*torso_cap_hips_" + str(lod): "torso_" + str(lod),
+        "*torso_cap_l_arm_" + str(lod): "torso_" + str(lod),
+        "*torso_cap_r_arm_" + str(lod): "torso_" + str(lod),
+        "*uchest_l_" + str(lod): "torso_" + str(lod),
+        "*uchest_r_" + str(lod): "torso_" + str(lod)
     }
     
     if "*" in obj.name:
@@ -252,16 +255,16 @@ def GetTagParent(obj, lod):
     
 def GetCapParent(obj, lod):
     
-     caps = {
-        "l_leg": "l_leg_" + lod,
-        "r_leg": "r_leg_" + lod,
-        "l_arm": "l_arm_" + lod,
-        "r_arm": "r_arm_" + lod,
-        "l_hand": "l_hand_" + lod,
-        "r_hand": "r_hand_" + lod,
-        "head": "head_" + lod,
-        "torso": "torso_" + lod,
-        "hips": "hips_" + lod,
+    caps = {
+        "l_leg": "l_leg_" + str(lod),
+        "r_leg": "r_leg_" + str(lod),
+        "l_arm": "l_arm_" + str(lod),
+        "r_arm": "r_arm_" + str(lod),
+        "l_hand": "l_hand_" + str(lod),
+        "r_hand": "r_hand_" + str(lod),
+        "head": "head_" + str(lod),
+        "torso": "torso_" + str(lod),
+        "hips": "hips_" + str(lod)
     }
     
     splitter = obj.name.split("_")
@@ -271,35 +274,36 @@ def GetCapParent(obj, lod):
         splitter = splitter[0] + "_" + splitter[1]
         return bpy.data.objects[caps[splitter]]
     
-    return bpy.data.objects[caps[splitter[0]]   
+    return bpy.data.objects[caps[splitter[0]]]  
     
 def GetBodyParent(obj, lod):           
 
     parts = {
-        "stupidtriangle_off": "model_root_" + lod,
-        "hips": "stupidtriangle_off_" + lod,
-        "l_leg": "hips_" + lod,
-        "r_leg": "hips_" + lod,
-        "torso": "hips_" + lod,
-        "l_arm": "torso_" + lod,
-        "r_arm": "torso_" + lod,
-        "l_hand": "l_arm_" + lod,
-        "r_hand": "r_arm_" + lod,
-        "head": "torso_" + lod,
+        "stupidtriangle_off": "model_root_" + str(lod),
+        "hips": "stupidtriangle_off_" + str(lod),
+        "l_leg": "hips_" + str(lod),
+        "r_leg": "hips_" + str(lod),
+        "torso": "hips_" + str(lod),
+        "l_arm": "torso_" + str(lod),
+        "r_arm": "torso_" + str(lod),
+        "l_hand": "l_arm_" + str(lod),
+        "r_hand": "r_arm_" + str(lod),
+        "head": "torso_" + str(lod)
     } 
     
     splitter = obj.name.split("_")     
   
     if "skeleton_root" in obj.name or "model_root" in obj.name:
-        return bpy.data.objects("scene_root")
-  
-    if obj.name.startswith("l_") or obj.name.startswith("r_") or "stupidtriangle" in obj.name: # Determine: object arm or leg     
-        splitter = splitter[0] + "_" + splitter[1]
-        
-    return bpy.data.objects[parts[splitter]]
-
-def setParent(obj, parentTo):
-    obj.parent = parentTo
+        return bpy.data.objects["scene_root"]
+    
+    if splitter[0] in parts:
+        return bpy.data.objects[parts.get(splitter[0])]
+    
+    if splitter[0] + "_" + splitter[1] in parts: # Determine: object arm or leg     
+        return bpy.data.objects[parts.get(splitter[0] + "_" + splitter[1])]
+    
+    else:  
+        print("WARNING: Wrong naming convention used on object: " + obj.name)
 
 # description: After you've selected a path I will create model_default.skin for you.   
 def CreateSkinFile():
