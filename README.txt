@@ -37,6 +37,8 @@ Parent Tags: All tags will be parented.
 
 Make sure to use the naming convention as stated above!
 
+Clean duplicates in hierarchy: All objects having the name ending with .001 and above, will be deleted.
+
 Folder: Select a location where you want to send model_default.skin to.
 Create Skin File: Creates a model_default.skin file. No more tedious manual typing :)
 =======================================================================================================================================================================
