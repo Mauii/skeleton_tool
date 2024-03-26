@@ -1,16 +1,13 @@
-			Author: Maui							  					Blender version: 2.91
+			Author: Maui							  					Blender version: 4.0.2
 -----------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 INSTALLATION:
-Go to: Edit ==> Preferences ==> Addons ==> Install and select skeleton_tool.zip. Now make sure to click the checkbox to make the addon active.
+Edit ==> Preferences ==> Addons ==> Install
+The same way as you would do any addon.
 
 =======================================================================================================================================================================
-FUNCTIONS AND USAGE:
+NAMING CONVENTION
 =======================================================================================================================================================================
-
-Parent Objects/Tags: When this button is selected, every object will be parented according to the hierarchy standards. Naming convention has to be followed!
-
-Example: My skeleton has an object named helmet. If I don't rename helmet to head_helmet, this object will cause an error.
 
 				  The "hierarchy" is shown below.
 
@@ -19,16 +16,22 @@ Example: My skeleton has an object named helmet. If I don't rename helmet to hea
 			    l_hand ==> l_arm ==> torso <== r_arm <== r_hand
 		   			         |
 	 			      l_leg ==> hips <== r_leg
-				      
-After parenting everything, it will set the Ghoul2 Name of the objects.
+
+If you have armor or other accessories for your bodyparts, you should name it like this: head_helmet_x (x: LOD level)
+
 
 =======================================================================================================================================================================
-Folder |textbox| Folder icon (pressable): When this button is pressed, you have to navigate to the folder where you want the model_default.skin to be created.
+FUNCTIONS AND USAGE:
 =======================================================================================================================================================================
 
-=======================================================================================================================================================================
-Create Skin File: When this button is pressed, the addon creates a model_default.skin file and places it on the earlier determined folder, which otherwise would be created 
-manually. This will use caps aswell.
+Parent Parts: All bodyparts will be parented.
+Parent Caps: All caps will be parented.
+Parent Tags: All tags will be parented.
+
+Make sure to use the naming convention as stated above!
+
+Folder: Select a location where you want to send model_default.skin to.
+Create Skin File: Creates a model_default.skin file. No more tedious manual typing :)
 =======================================================================================================================================================================
 
 
