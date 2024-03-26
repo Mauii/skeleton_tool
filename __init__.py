@@ -1,20 +1,3 @@
-# ##### BEGIN GPL LICENSE BLOCK #####
-#
-#  This program is free software; you can redistribute it and/or
-#  modify it under the terms of the GNU General Public License
-#  as published by the Free Software Foundation; either version 2
-#  of the License, or (at your option) any later version.
-#
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-#
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software Foundation,
-#  Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# ##### END GPL LICENSE BLOCK #####
 import bpy
 from bpy.props import (IntProperty, StringProperty)
 from jediacademy import *
@@ -55,7 +38,7 @@ class OBJECT_PT_SkeletonTool(bpy.types.Panel):
         box.operator("body.parent") 
         box.operator("cap.parent") 
         box.operator("tag.parent") 
-        box.operator("object.clean")
+        box.operator("hierarchy.clean")
         
         box = layout.box()        
         box.prop(settings, "folder_path", text="Folder")
@@ -94,7 +77,7 @@ class OBJECT_OT_CapParent(bpy.types.Operator):
             
             lod = LastIndex(obj) 
             
-            if "_cap_" not in obj.name:
+            if "*" in obj.name or "cap" not in obj.name:
                 continue
                 
             obj.parent = GetCapParent(obj, lod)
@@ -141,14 +124,14 @@ class OBJECT_OT_CreateSkinfile(bpy.types.Operator):
     bl_idname = "file.create_skin"
     bl_label = "Create Skin"
 
-    def execute(self, context):
+
+    def execute(self, context): 
         
         SetGhoul2Name()
-        CreateSkinFile()
-
-        return {'FINISHED'} 
+        CreateSkinFile() 
     
-        
+        return {'FINISHED'}
+    
 class AddonProperties(bpy.types.PropertyGroup):
         
     folder_path: StringProperty(
@@ -158,6 +141,7 @@ class AddonProperties(bpy.types.PropertyGroup):
         maxlen=1024,
         subtype="FILE_PATH",
     )
+    
 # END CLASSES
 
    
@@ -190,7 +174,8 @@ def SetGhoul2Name():
    
         obj.g2_prop_name = obj.name.replace("_" + str(lod), "")
 
-
+# Description: split the obj.name, iterate and see if it's a number, return if so.
+#              this will be used everywhere in the addon.
 def LastIndex(obj):
     
     object = obj.name.split("_")
@@ -198,7 +183,9 @@ def LastIndex(obj):
     for index in object:
         if index.isnumeric():
             return index    
-    
+
+# Description: This one speaks for itself, it checks if * is in the name,
+#              navigate in the dictionary and parent accordingly.    
 def GetTagParent(obj, lod):
     
     tags = {
@@ -252,30 +239,34 @@ def GetTagParent(obj, lod):
     
     if "*" in obj.name:
         return bpy.data.objects[tags[obj.name]]
-    
+
+# Description: This function takes an object and lod level as argument,
+#              these will be splitted and checked in a dictionary.    
 def GetCapParent(obj, lod):
     
     caps = {
         "l_leg": "l_leg_" + str(lod),
         "r_leg": "r_leg_" + str(lod),
         "l_arm": "l_arm_" + str(lod),
-        "r_arm": "r_arm_" + str(lod),
+       "r_arm": "r_arm_" + str(lod),
         "l_hand": "l_hand_" + str(lod),
         "r_hand": "r_hand_" + str(lod),
-        "head": "head_" + str(lod),
-        "torso": "torso_" + str(lod),
-        "hips": "hips_" + str(lod)
+        "head_cap": "head_" + str(lod),
+        "torso_cap": "torso_" + str(lod),
+        "hips_cap": "hips_" + str(lod)
     }
     
     splitter = obj.name.split("_")
-        
-    if obj.name.startswith("l_") or obj.name.startswith("r_"): # Determine: left or right
-
-        splitter = splitter[0] + "_" + splitter[1]
-        return bpy.data.objects[caps[splitter]]
     
-    return bpy.data.objects[caps[splitter[0]]]  
+    if "cap" in splitter:
+               
+        if splitter[0] + "_" + splitter[1] in caps: # Determine: object arm or leg     
+            print(obj.name + " check 1")
+            return bpy.data.objects[caps.get(splitter[0] + "_" + splitter[1])]
     
+# Description: Goes through every given object, split and see if it's in the dictionary.
+#              I added torso_l and torso_r since default jka models might have them,
+#              just in case someone uses this in their frankenstein model.
 def GetBodyParent(obj, lod):           
 
     parts = {
@@ -288,7 +279,9 @@ def GetBodyParent(obj, lod):
         "r_arm": "torso_" + str(lod),
         "l_hand": "l_arm_" + str(lod),
         "r_hand": "r_arm_" + str(lod),
-        "head": "torso_" + str(lod)
+        "head": "torso_" + str(lod),
+        "torso_l": "torso_" + str(lod),
+        "torso_r": "torso_" + str(lod)
     } 
     
     splitter = obj.name.split("_")     
@@ -296,11 +289,11 @@ def GetBodyParent(obj, lod):
     if "skeleton_root" in obj.name or "model_root" in obj.name:
         return bpy.data.objects["scene_root"]
     
-    if splitter[0] in parts:
-        return bpy.data.objects[parts.get(splitter[0])]
-    
     if splitter[0] + "_" + splitter[1] in parts: # Determine: object arm or leg     
         return bpy.data.objects[parts.get(splitter[0] + "_" + splitter[1])]
+    
+    if splitter[0] in parts: # Determine: Regular object like head, torso or hips
+        return bpy.data.objects[parts.get(splitter[0])]
     
     else:  
         print("WARNING: Wrong naming convention used on object: " + obj.name)
@@ -357,8 +350,7 @@ def CreateSkinFile():
 def register(): 
     for cls in classes:
         bpy.utils.register_class(cls)
-    bpy.types.Scene.settings = bpy.props.PointerProperty(type=AddonProperties)
-   
+    bpy.types.Scene.settings = bpy.props.PointerProperty(type=AddonProperties)   
    
 def unregister():
     for cls in classes:
