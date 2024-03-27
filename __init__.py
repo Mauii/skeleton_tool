@@ -1,7 +1,6 @@
 import bpy
 from bpy.props import (IntProperty, StringProperty)
 from jediacademy import *
-from mathutils.bvhtree import BVHTree
 
 
 # ADDON INFORMATION
@@ -75,22 +74,24 @@ class OBJECT_OT_BodyParent(bpy.types.Operator):
             "l_hand": "l_arm",
             "r_hand": "r_arm",
             "head": "torso",
-        }  
+        }
+        
+        partsoff = {
+            "stupidtriangle_off": "model_root",
+            "hips": "stupidtriangle_off"  
+        }
         
         for obj in bpy.data.objects:
 
             lod = lastIndex(obj)        
             
-            if "stupidtriangle_off" in obj.name:
-                parts["stupidtriangle_off"] = "model_root"
-            
             if "_cap_" in obj.name or "*" in obj.name or "scene_root" in obj.name or obj == None:
                 continue
             
-            if getBodyParent(obj, lod, parts) == None:
+            if getBodyParent(obj, lod, parts, partsoff) == None:
                 continue
             
-            obj.parent = bpy.data.objects[getBodyParent(obj, lod, parts)]
+            obj.parent = bpy.data.objects[getBodyParent(obj, lod, parts, partsoff)]
         
         return {'FINISHED'}
     
@@ -369,7 +370,7 @@ def getCapParent(obj, lod):
 # Description: Goes through every given object, split and see if it's in the dictionary.
 #              I added torso_l and torso_r since default jka models might have them,
 #              just in case someone uses this in their frankenstein model.
-def getBodyParent(obj, lod, parts):              
+def getBodyParent(obj, lod, parts, partsoff):              
   
     if "skeleton_root" in obj.name or "model_root" in obj.name:
         return "scene_root"
@@ -378,9 +379,13 @@ def getBodyParent(obj, lod, parts):
         newObject = "_".join(obj.name.split("_", 2)[:2]) # left or right
     else:
         newObject = obj.name.replace("_" + lod, "") # Single object   
-        
-    if newObject in parts:    
+    
+    if newObject in partsoff:
+        return partsoff.get(newObject) + "_" + lod    
+    
+    elif newObject in parts:    
         return parts.get(newObject) + "_" + lod
+    
     elif obj.name.split("_")[0] in parts:  
         newObject = obj.name.split("_")[0]
         return newObject + "_" + lod
