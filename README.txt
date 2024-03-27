@@ -41,6 +41,10 @@ Clean duplicates in hierarchy: All objects having the name ending with .001 and 
 
 Folder: Select a location where you want to send model_default.skin to.
 Create Skin File: Creates a model_default.skin file. No more tedious manual typing :)
+
+Added functionality for vehicles
+Parent Vehicle Parts - parents all vehicle parts, tags and caps
+Remove Parents - Removes parents from all objects (used for testing my functions)
 =======================================================================================================================================================================
 
 
