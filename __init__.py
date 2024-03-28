@@ -2,8 +2,6 @@ import bpy
 from bpy.props import (IntProperty, StringProperty)
 from jediacademy import *
 
-
-# ADDON INFORMATION
 bl_info = {
     "name": "Skeleton Tool",
     "author": "Maui",
@@ -14,10 +12,8 @@ bl_info = {
     "category": "Rigging",
 }
 
-
-# BEGIN CLASSES
 class OBJECT_PT_SkeletonTool(bpy.types.Panel):
-    """Creates a Panel in the Object properties window"""
+    """ Creates a Panel in the Object properties window """
     bl_label = "Skeleton Tool"
     bl_idname = "OBJECT_PT_skeleton_tool"
     bl_space_type = 'PROPERTIES'
@@ -29,117 +25,114 @@ class OBJECT_PT_SkeletonTool(bpy.types.Panel):
 
         obj = context.object
         settings = context.scene.settings
-        
-        row = layout.row()
-        row.label(text="Player Characters")
-        
+               
         box = layout.box() 
+        box.label(text="Player Characters")
         box.operator("body.parent") 
         box.operator("cap.parent") 
         box.operator("tag.parent") 
-        box.operator("hierarchy.clean")
         
         box = layout.box()        
-        box.prop(settings, "folder_path", text="Folder")
+        box.prop(settings, "folder_path", text="Save to")
+        box.operator("g2.propset")
         box.operator("file.create_skin")
         
-        row = layout.row()
-        row.label(text="Vehicles")
-        
         box = layout.box()
+        box.label(text="Vehicles")
         box.operator("vehicle.parent")
-        
-        row = layout.row()
-        row.label(text="Misc")
-        
+              
         box = layout.box()
+        box.label(text="Misc")
         box.operator("remove.parent")
+        box.operator("hierarchy.clean")
         
 
 class OBJECT_OT_BodyParent(bpy.types.Operator):
-    """Parent all objects and tags"""
+    """ Parent all body parts if naming convention is respected """
     bl_idname = "body.parent"
     bl_label = "Parent Body Parts"
 
     def execute(self, context):
         
-        parts = {
-            "stupidtriangle": "model_root",
-            "hips": "stupidtriangle",
-            "l_leg": "hips",
-            "r_leg": "hips",
-            "torso": "hips",
-            "l_arm": "torso",
-            "r_arm": "torso",
-            "l_hand": "l_arm",
-            "r_hand": "r_arm",
-            "head": "torso",
-        }
+        if "pelvis" not in bpy.data.armatures["skeleton_root"].bones:
+            self.report({'ERROR'}, "You're trying to use a function for Character Models!")
         
-        partsoff = {
-            "stupidtriangle_off": "model_root",
-            "hips": "stupidtriangle_off"  
-        }
+            return {'FINISHED'}
         
-        for obj in bpy.data.objects:
-
-            lod = lastIndex(obj)        
+        for object in bpy.data.objects:       
             
-            if "_cap_" in obj.name or "*" in obj.name or "scene_root" in obj.name or obj == None:
+            if "_cap_" in object.name or object.g2_prop_tag or "scene_root" in object.name:
                 continue
             
-            if getBodyParent(obj, lod, parts, partsoff) == None:
+            if getBodyParent(object, lastIndex(object)) == False:
+                self.report({'ERROR'}, stripLOD(object) + " was not in the partlist, parenting to torso_" + lastIndex(object))
+                object.parent = bpy.data.objects["torso_" + lastIndex(object)]
                 continue
             
-            obj.parent = bpy.data.objects[getBodyParent(obj, lod, parts, partsoff)]
+            object.parent = bpy.data.objects[getBodyParent(object, lastIndex(object))]
         
         return {'FINISHED'}
     
 class OBJECT_OT_CapParent(bpy.types.Operator):
-    """Parent all caps"""
+    """ Parent all caps """
     bl_idname = "cap.parent"
     bl_label = "Parent Caps"
 
     def execute(self, context):
         
-        for obj in bpy.data.objects:
+        if "pelvis" not in bpy.data.armatures["skeleton_root"].bones:
+            self.report({'ERROR'}, "You're trying to use a function for Character Models!")
+        
+            return {'FINISHED'}
+        
+        for object in bpy.data.objects:
             
-            lod = lastIndex(obj) 
-            
-            if "*" in obj.name or "_cap_" not in obj.name or obj == None:
+            if object.g2_prop_tag or "_cap_" not in object.name or "scene_root" in object.name:
                 continue
-                
-            obj.parent = bpy.data.objects[getCapParent(obj, lod)]
+            
+            object.parent = bpy.data.objects[getCapParent(object, lastIndex(object))]
                  
             
         return {'FINISHED'}    
 
 class OBJECT_OT_TagParent(bpy.types.Operator):
-    """Parent all tags"""
+    """ Parent all tags """
     bl_idname = "tag.parent"
     bl_label = "Parent Tags"
 
     def execute(self, context):
         
-        for obj in bpy.data.objects:
-            
-            lod = lastIndex(obj)  
+        if "pelvis" not in bpy.data.armatures["skeleton_root"].bones:
+            self.report({'ERROR'}, "You're trying to use a function for Character Models!")
         
-            if "*" not in obj.name or obj == None:
+            return {'FINISHED'}
+            
+        for object in bpy.data.objects:  
+        
+            if object.g2_prop_tag == False or object.g2_prop_off or "scene_root" in object.name:
                 continue
             
-            obj.parent = bpy.data.objects[getTagParent(obj, lod)]
+            object.parent = bpy.data.objects[getTagParent(object, lastIndex(object))]
         
         return {'FINISHED'}  
     
 class OBJECT_OT_VehicleParent(bpy.types.Operator):
-    """Parent all Vehicle parts"""
+    """ Parent objects, caps and tags corcerning vehicles """
     bl_idname = "vehicle.parent"
     bl_label = "Parent Vehicle Parts"
 
     def execute(self, context):
         
-        setVehicleObjectParent()
+        if "pelvis" in bpy.data.armatures["skeleton_root"].bones:
+            self.report({'ERROR'}, "You're trying to use a function for Vehicles!")
+            
+            return {'FINISHED'}
+        
+        for object in bpy.data.objects:     
+            if "scene_root" in object.name:
+                continue
+            
+            object.parent = bpy.data.objects[setVehicleObjectParent(object, lastIndex(object))]
         
         return {'FINISHED'} 
     
@@ -161,10 +154,9 @@ class OBJECT_OT_Clean(bpy.types.Operator):
 
     def execute(self, context):
         
-        for obj in bpy.data.objects:
-            
-            if ".00" in obj.name:
-                obj.select_set(True)
+        for object in bpy.data.objects:         
+            if ".00" in object.name:
+                object.select_set(True)
                 bpy.ops.object.delete(use_global=False, confirm=True)
         
         return {'FINISHED'}
@@ -173,37 +165,49 @@ class OBJECT_OT_Clean(bpy.types.Operator):
 class OBJECT_OT_CreateSkinfile(bpy.types.Operator):
     """Create model_default.skin file"""
     bl_idname = "file.create_skin"
-    bl_label = "Create Skin"
-
+    bl_label = "Create model_default.skin"
+    
+    def execute(self, context): 
+        
+        createSkinFile() 
+    
+        return {'FINISHED'}
+    
+class OBJECT_OT_SetGhoul2Properties(bpy.types.Operator):
+    """Sets all ghoul2 properties"""
+    bl_idname = "g2.propset"
+    bl_label = "Set Ghoul 2 Properties"
 
     def execute(self, context): 
         
-        setGhoul2Name()
-        createSkinFile() 
+        for object in bpy.data.objects:       
+            if "model" in object.name or "scene" in object.name or "skeleton" in object.name:
+                continue
+                
+            setGhoul2Properties(object, lastIndex(object))
     
         return {'FINISHED'}
     
 class AddonProperties(bpy.types.PropertyGroup):
         
     folder_path: StringProperty(
-        name="Folder",
+        name="Save to:",
         default="",
         description="Model folder",
         maxlen=1024,
         subtype="FILE_PATH",
     )
     
-# END CLASSES
-
-   
-# ALL FUNCTIONS BELOW           
-  
-def unparentAll():
-    for obj in bpy.data.objects:
-        obj.parent = None
-
-def getVehicleObjectParent(object, list):
     
+           
+def unparentAll():
+    """ Loop through all objects and remove the parent. """
+    for object in bpy.data.objects:
+        object.parent = None
+
+def getVehicleObjectParent(object):  
+    """ Goes through the dictionary and return the key value if found, else return body. """
+       
     dictionary = {
         "body": "model_root",
         "l_wing1": "body",
@@ -212,80 +216,60 @@ def getVehicleObjectParent(object, list):
         "r_wing2": "r_wing1"
         }
     
-    if len(list) > 2:
-        list = list[0] + "_" + list[1]
-    else:
-        list = list[0] 
-    
-    if list in dictionary:
-        return dictionary.get(list)
+    if object in dictionary:
+        return dictionary.get(object)
 
     return "body"   
 
-def setVehicleObjectParent():       
-    for object in bpy.data.objects:
-            
-        # scene_root is the grand parent, no need to assign a parent to this
-        if "scene_root" in object.name or object == None:
-            continue
-           
-        # Split object.name in segments: l_wing1_0 makes a list l, wing1, 0
-        splitter = object.name.split("_")
-        
-        # Find LOD level in splitter and assign value to lod
-        for index in splitter:
-            if index.isnumeric():
-                lod = index
-        
-        if "skeleton_root" in object.name or "model_root" in object.name:
-            object.parent = bpy.data.objects["scene_root"]
-            continue 
 
-        object.parent = bpy.data.objects[getVehicleObjectParent(object, splitter) + "_" + lod]  
-              
-# description: This goes through every object, gives them an armature and check whether they are a tag or an object and set Ghoul2 properties accordingly.
-def setGhoul2Name():
+def setVehicleObjectParent(object, lod):       
+	      
+    if "skeleton" in object.name or "model" in object.name:
+        return "scene_root"
     
-    exclude = (
-        "scene", 
-        "model",
-        "skeleton"
-    )
-        
-    for obj in bpy.data.objects:
-        
-        if obj == None:
-            continue
-        
-        lod = lastIndex(obj)
-            
-        if "g2_prop_off" not in obj:
-            obj.g2_prop_off = False
-        if "g2_prop_tag" not in obj:
-            obj.g2_prop_tag = False
-        if "g2_prop_name" not in obj:
-            obj.g2_prop_name = ""
-        if "g2_prop_shader" not in obj:
-            obj.g2_prop_shader = ""
-    
-        if obj.name.split("_")[0] in exclude or "*" in obj.name:
-            continue
-   
-        obj.g2_prop_name = obj.name.replace("_" + lod, "")
+    return getVehicleObjectParent(stripLOD(newObject)) + "_" + lod  
 
-# Description: split the obj.name, iterate and see if it's a number, return if so.
-#              this will be used everywhere in the addon.
-def lastIndex(obj):
+
+def stripLOD(object):
     
-    object = obj.name.split("_")
+    newObject = object.name.split("_")
     
-    for index in object:
+    # left, right, hand or arm, return as needed
+    if object.name.startswith("l_") or object.name.startswith("r_"):
+        if "hand" in newObject[1]:  # if it's hand or arm, return as such
+            return newObject[0] + "_" + newObject[1]  # return l_hand or l_arm for example
+        else:
+            return newObject[1]
+    else:
+        return newObject[0]
+      
+      
+def setGhoul2Properties(object, lod):
+    
+    g2Name = object.name.replace("_" + lod, "")    
+            
+    if "g2_prop_off" not in object:
+        object.g2_prop_off = False
+        
+    if "g2_prop_tag" not in object:
+        object.g2_prop_tag = False
+        
+    if "g2_prop_name" not in object:
+        object.g2_prop_name = g2Name
+        
+    if "g2_prop_shader" not in object:
+        object.g2_prop_shader = ""
+    
+
+def lastIndex(object):
+    
+    newObject = object.name.split("_")
+    
+    for index in newObject:      
         if index.isnumeric():
             return str(index)    
-
-# Description: This one speaks for itself, it checks if * is in the name,
-#              navigate in the dictionary and parent accordingly.    
-def getTagParent(obj, lod):
+   
+def getTagParent(object, lod):
     
     tags = {
         "*back": "torso",
@@ -336,59 +320,63 @@ def getTagParent(obj, lod):
         "*uchest_r": "torso"
     }
     
-    newObject = obj.name.replace("_" + lod, "")
+    newObject = object.name.replace("_" + lod, "")
     
-    if "*" in obj.name:
-        if newObject in tags:
-            return tags.get(newObject) + "_" + lod
-        else:
-            return "torso" + "_" + lod
-
-# Description: This function takes an object and lod level as argument,
-#              these will be splitted and checked in a dictionary.    
-def getCapParent(obj, lod):
-    
-    caps = {
-        "l_leg": "l_leg",
-        "r_leg": "r_leg",
-        "l_arm": "l_arm",
-        "r_arm": "r_arm",
-        "l_hand": "l_hand",
-        "r_hand": "r_hand",
-        "head": "head",
-        "torso": "torso",
-        "hips": "hips"
-    }
-    
-    newObject = "_cap_".join(obj.name.split("_cap_", 1)[:1])    
-            
-    if newObject in caps:    
-        return caps.get(newObject) + "_" + lod
+    if newObject in tags:
+        return tags.get(newObject) + "_" + lod
     else:
-        print("WARNING: Cap " + obj.name + " has not been found. You sure you're using the right function?")
+        return "torso_" + lod
+   
+def getCapParent(object, lod):
+    
+    newObject = "_cap_".join(object.name.split("_cap_", 1)[:1])    
+
+    return newObject + "_" + lod
         
-# Description: Goes through every given object, split and see if it's in the dictionary.
-#              I added torso_l and torso_r since default jka models might have them,
-#              just in case someone uses this in their frankenstein model.
-def getBodyParent(obj, lod, parts, partsoff):              
+def getBodyParent(object, lod):              
   
-    if "skeleton_root" in obj.name or "model_root" in obj.name:
+    parts = {
+        "leg": "hips_",
+        "torso": "hips_",
+        "arm": "torso_",
+        "l_hand": "l_arm_",
+        "r_hand": "r_arm_",
+        "head": "torso_",
+    }
+  
+    if "skeleton_root" in object.name or "model_root" in object.name:
         return "scene_root"
     
-    if obj.name.count("_") > 1:
-        newObject = "_".join(obj.name.split("_", 2)[:2]) # left or right
+    if "stupidtriangle" in object.name or "stupidtriangle_off" in object.name:
+        return "model_root_" + lod
+    
+    if object.name.startswith("hips"):
+        if object.name.split("_")[1].isnumeric():
+            if bpy.data.objects.find("stupidtriangle_" + lod) != -1:
+                return "stupidtriangle_" + lod
+            elif bpy.data.objects.find("stupidtriangle_off_" + lod) != -1:
+                return "stupidtriangle_off_" + lod
+        else:
+            return "hips_" + lod
+    
+    newObject = stripLOD(object)
+    
+    if object.name.startswith("torso"):
+        if object.name.split("_")[1].isnumeric():
+            return parts.get(newObject) + lod
+        else:
+            return "torso_" + lod
+    
+    if object.name.startswith("head"):
+        if object.name.split("_")[1].isnumeric():
+            return parts.get(newObject) + lod
+        else:
+            return "head_" + lod
+    
+    if newObject in parts:
+        return parts.get(newObject) + lod
     else:
-        newObject = obj.name.replace("_" + lod, "") # Single object   
-    
-    if newObject in partsoff:
-        return partsoff.get(newObject) + "_" + lod    
-    
-    elif newObject in parts:    
-        return parts.get(newObject) + "_" + lod
-    
-    elif obj.name.split("_")[0] in parts:  
-        newObject = obj.name.split("_")[0]
-        return newObject + "_" + lod
+        return False
 
 # description: After you've selected a path I will create model_default.skin for you.   
 def createSkinFile():
@@ -413,25 +401,25 @@ def createSkinFile():
     
     caps = ""
     
-    for obj in bpy.data.objects:
+    for object in bpy.data.objects:
                 
-        if "*" in obj.name or "0" not in obj.name or obj.name in exclude:
+        if object.g2_prop_tag or object.name in exclude or object == None:
             continue   
                 
-        if obj.g2_prop_off and "_cap_" in obj.name:
+        if object.g2_prop_off and "_cap_" in object.name:
             
-            if "Material" in obj.active_material.name.split("."):
-                caps = caps + obj.g2_prop_name + ",*off\n"
+            if "Material" in object.active_material.name.split("."):
+                caps = caps + object.g2_prop_name + ",*off\n"
                 continue
             
-            caps = caps + obj.g2_prop_name + "," + obj.active_material.name.split(".tga")[0] + ".tga\n"
+            caps = caps + object.g2_prop_name + "," + object.active_material.name.split(".tga")[0] + ".tga\n"
             continue
         
-        if "Material" in obj.active_material.name:
-            file.write(obj.g2_prop_name + ",*off\n")
+        if "Material" in object.active_material.name:
+            file.write(object.g2_prop_name + ",*off\n")
             continue
                 
-        file.write(obj.g2_prop_name + "," + obj.active_material.name.split(".tga")[0] + ".tga\n")  
+        file.write(object.g2_prop_name + "," + object.active_material.name.split(".tga")[0] + ".tga\n")  
 
     file.write("\n")
     file.write(caps)
@@ -449,19 +437,18 @@ def unregister():
         bpy.utils.unregister_class(cls)
     del bpy.types.Scene.settings
 
-
 classes = [
     OBJECT_PT_SkeletonTool,
     OBJECT_OT_BodyParent,
     OBJECT_OT_CapParent,
     OBJECT_OT_TagParent,
+    OBJECT_OT_SetGhoul2Properties,
     OBJECT_OT_Clean,
     OBJECT_OT_CreateSkinfile,
-    OBJECT_OT_VehicleParent,
+    OBJECT_OT_VehicleParent,    
     OBJECT_OT_UnparentAll,
     AddonProperties
 ]
-
 
 if __name__ == "__main__":
     register()
