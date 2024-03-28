@@ -1,4 +1,4 @@
-			Author: Maui							  					Blender version: 4.0.2
+			Author: Maui							  					Blender version: 4.1
 -----------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 INSTALLATION:
@@ -31,20 +31,23 @@ If you have armor or other accessories for your bodyparts, you should name it li
 FUNCTIONS AND USAGE:
 =======================================================================================================================================================================
 
-Parent Parts: All bodyparts will be parented.
-Parent Caps: All caps will be parented.
-Parent Tags: All tags will be parented.
+(** Shows a message if you're using this function while having a vehicle skeleton_root in the mix.)
+(* Shows a message if you're using this function while having a humanoid skeleton_root in the mix.)
+
+Parent Parts: All bodyparts will be parented. ** 
+Parent Caps: All caps will be parented. **
+Parent Tags: All tags will be parented. **
 
 Make sure to use the naming convention as stated above!
 
-Clean duplicates in hierarchy: All objects having the name ending with .001 and above, will be deleted.
-
 Folder: Select a location where you want to send model_default.skin to.
-Create Skin File: Creates a model_default.skin file. No more tedious manual typing :)
 
-Added functionality for vehicles
-Parent Vehicle Parts - parents all vehicle parts, tags and caps
+Create Skin File: Creates a model_default.skin file.
+
+Parent Vehicle Parts - parents all vehicle parts, tags and caps *
+
 Remove Parents - Removes parents from all objects (used for testing my functions)
+Clean duplicates in hierarchy: All objects having the name ending with .001 and above, will be deleted.
 =======================================================================================================================================================================
 
 
