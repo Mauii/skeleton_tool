@@ -6,7 +6,7 @@ bl_info = {
     "name": "Skeleton Tool",
     "author": "Maui",
     "version": (2),
-    "blender": (4, 0, 2),
+    "blender": (4, 1),
     "location": "Object Properties -> Skeleton Tool Panel",
     "description": "This addon has multiple functions which drastingly decreases time spent in parenting of objects, caps, tags and creating a .skin file.",
     "category": "Rigging",
