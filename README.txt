@@ -1,4 +1,4 @@
-			Author: Maui				Addon version: 2.4	  					Blender version: 4.1
+			Author: Maui				Addon version: 2.5	  					Blender version: 4.1
 -----------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 INSTALLATION:
@@ -9,14 +9,7 @@ COLLABORATION:
 This addon is being coded together with Vioxini. He is a modeller and a coder. He had some nice ideas to implement into the addon.
 
 EXTRA:
-mjt came with the idea to support t
-Vehicles aswell.
-
-=======================================================================================================================================================================
-=======================================================================================================================================================================
-LITTLE EXTRA: I included a blender file with skeleton_root and all the default jka tags of every LOD level.
-=======================================================================================================================================================================
-=======================================================================================================================================================================
+mjt came with the idea to support Vehicles aswell.
 
 =======================================================================================================================================================================
 NAMING CONVENTION
@@ -37,27 +30,24 @@ If you have armor or other accessories for your bodyparts, you should name it li
 FUNCTIONS AND USAGE:
 =======================================================================================================================================================================
 
-(** Shows a message if you're using this function while having a vehicle skeleton_root in the mix.)
-(* Shows a message if you're using this function while having a humanoid skeleton_root in the mix.)
+Parent body parts 
+Parent caps 
+Parent tags
+Create tags - for model_root_0
 
-Parent Body: All bodyparts will be parented. ** 
-Parent Caps: All caps will be parented. **
-Parent Tags: All tags will be parented. **
+Create LODs - which duplicates model_root_0 completely and reduces level of detail on the mesh
+You can set the variables on how to dissolve the verts
 
-Make sure to use the naming convention as stated above!
+Create .SKIN - creates a model_default.skin file at the location you selected by using the file browser
+Set G2 Props - sets every property your objects need
+Assemble Vehicle - parents all body parts, caps and tags of vehicles
+Clean duplicates - cleans up everything that has .00 in the name
+Unparent all - if for some reason you want all objects to be unparented
+Remove Empty Vertex Groups - deletes every unused vertex group in all objects (useful when splitting your weighted model)
 
-Folder: Select a location where you want to send model_default.skin to.
-
-Set G2 Props: Sets the g2_prop_name for everything
-Create Skin File: Creates a model_default.skin file.
-
-Parent Vehicle Parts - parents all vehicle parts, tags and caps *
-
-Create LODs: Creates all the LOD levels and decreases the level of detail accordingly.
-You have the option to alter the way it reduces the level of detail, so expertimenting is advised.
-
-Remove Parents - Removes parents from all objects (used for testing my functions)
-Clean duplicates in hierarchy: All objects having the name ending with .001 and above, will be deleted.
+Use these functions carefully as some of them need to be used in a specific way.
+If you have only have model_root_0 without tags, you click on Create Tags, Parent Tags and then Create LODs
+Before creating the skin file you have to select a folder path and then click Set G2 Props and finally the Create .SKIN
 =======================================================================================================================================================================
 
 
