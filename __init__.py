@@ -5,7 +5,7 @@ import math
 bl_info = {
     "name": "Skeleton Tool",
     "author": "Maui",
-    "version": (2, 4),
+    "version": (2, 5),
     "blender": (4, 1),
     "location": "Object Properties -> Skeleton Tool Panel",
     "description": "This addon has many features that decreases timewastes when preparing a model for JKA.",
@@ -26,12 +26,21 @@ class OBJECT_PT_SkeletonTool(bpy.types.Panel):
         obj = context.object
                
         box = layout.box() 
-        box.label(text="Parent Playermodel")
+        box.label(text="Playermodel")
         
         row = box.row()
         row.operator("body.parent") 
         row.operator("cap.parent") 
         row.operator("tag.parent")
+        box.operator("tag.create")
+        box.operator("lod.create")    
+        
+        box = layout.box() 
+        row = box.row()
+        box.label(text="Dissolve settings for LODs")
+        box.prop(settings, "angle_limit")
+        box.prop(settings, "delimit_item", expand=False)
+        box.prop(settings, "boundaries")         
         
         box = layout.box()        
         box.prop(settings, "folder_path")
@@ -44,17 +53,12 @@ class OBJECT_PT_SkeletonTool(bpy.types.Panel):
         box.label(text="Vehicles")
         box.operator("vehicle.parent")
         
-        box = layout.box() 
-        box.label(text="Dissolve settings for LODs")
-        box.prop(settings, "angle_limit")
-        box.prop(settings, "delimit_item", expand=True)
-        box.prop(settings, "boundaries")
-        box.operator("lod.create") 
               
         box = layout.box()
         box.label(text="Misc") 
         box.operator("remove.parent")
         box.operator("hierarchy.clean")
+        box.operator("empty_vertex_groups.delete")
 
 class AddonProperties(bpy.types.PropertyGroup):
         
@@ -68,6 +72,7 @@ class AddonProperties(bpy.types.PropertyGroup):
     
     angle_limit: bpy.props.FloatProperty(
         name = "Angle limit:",
+        default = 25
     )
     
     delimit_item: bpy.props.EnumProperty(
@@ -82,14 +87,244 @@ class AddonProperties(bpy.types.PropertyGroup):
         ]
     )
     
-    boundaries: bpy.props.EnumProperty(
-        name = "Boundaries",
-        description = "sample text",
-        items = [
-            ('True', "True", "use_dissolve_boundaries = True"),
-            ('False', "Frue", "use_dissolve_boundaries = False"),
-        ]
+    boundaries: bpy.props.BoolProperty(
+        name = " -> use_dissolve_boundaries",
+        description = "Boundaries, either True or False",
+        default = False
     )
+
+################################################################################################
+##                                                                                            ##
+##                                        CREATE TAGS                                         ##
+##                                                                                            ##
+################################################################################################
+
+class OBJECT_OT_CreateTags(bpy.types.Operator):
+    """ Creates tags for model_root_0 """
+    bl_idname = "tag.create"
+    bl_label = "Create Tags"
+
+    def execute(self, context):
+        
+        OBJECT_OT_CreateTags.create(str(bpy.context.scene.settings.select_lod))
+        
+        return {'FINISHED'}
+
+    def create():
+        tags = { # Every tagname 
+            0: "*back_0",
+            1: "*chestg_0",
+            2: "*head_back_0",
+            3: "*head_cap_torso_0",
+            4: "*head_eyes_0",
+            5: "*head_front_0",
+            6: "*head_left_0",
+            7: "*head_right_0",
+            8: "*head_top_0",
+            9: "*hip_bl_0",
+            10: "*hip_br_0",
+            11: "*hip_fl_0",
+            12: "*hip_fr_0",
+            13: "*hip_l_0",
+            14: "*hip_r_0",
+            15: "*hips_cap_l_leg_0",
+            16: "*hips_cap_r_leg_0",
+            17: "*hips_cap_torso_0",
+            18: "*hips_l_knee_0",
+            19: "*hips_r_knee_0",
+            20: "*l_arm_cap_l_hand_0",
+            21: "*l_arm_cap_torso_0",
+            22: "*l_arm_elbow_0",
+            23: "*l_hand_0",
+            24: "*l_hand_cap_l_arm_0",
+            25: "*l_leg_calf_0",
+            26: "*l_leg_cap_hips_0",
+            27: "*l_leg_foot_0",
+            28: "*lchest_l_0",
+            29: "*lchest_r_0",
+            30: "*r_arm_cap_r_hand_0",
+            31: "*r_arm_cap_torso_0",
+            32: "*r_arm_elbow_0",
+            33: "*r_hand_0",
+            34: "*r_hand_cap_r_arm_0",
+            35: "*r_leg_calf_0",
+            36: "*r_leg_cap_hips_0",
+            37: "*r_leg_foot_0",
+            38: "*shldr_l_0",
+            39: "*shldr_r_0",
+            40: "*torso_cap_head_0",
+            41: "*torso_cap_hips_0",
+            42: "*torso_cap_l_arm_0",
+            43: "*torso_cap_r_arm_0",
+            44: "*uchest_l_0",
+            45: "*uchest_r_0",
+            46: "stupidtriangle_0"
+        }
+        
+        groups = { # These are all the bones the tags are being parented to
+            "*back_0": "thoracic",
+            "*chestg_0": "upper_lumbar",
+            "*head_back_0": "cranium",
+            "*head_cap_torso_0": "cervical",
+            "*head_eyes_0": "cranium",
+            "*head_front_0": "cranium",
+            "*head_left_0": "cranium",
+            "*head_right_0": "cranium",
+            "*head_top_0": "cranium",
+            "*hip_bl_0": "lower_lumbar",
+            "*hip_br_0": "lower_lumbar",
+            "*hip_fl_0": "lower_lumbar",
+            "*hip_fr_0": "lower_lumbar",
+            "*hip_l_0": "lower_lumbar",
+            "*hip_r_0": "lower_lumbar",
+            "*hips_cap_l_leg_0": "ltibia",
+            "*hips_cap_r_leg_0": "rtibia",
+            "*hips_cap_torso_0": "lower_lumbar",
+            "*hips_l_knee_0": "ltibia",
+            "*hips_r_knee_0": "rtibia",
+            "*l_arm_cap_l_hand_0": "lradiusX",
+            "*l_arm_cap_torso_0": "lhumerusX",
+            "*l_arm_elbow_0": "lradius",
+            "*l_hand_0": "lhang_tag_bone",
+            "*l_hand_cap_l_arm_0": "lhand",
+            "*l_leg_calf_0": "ltibia",
+            "*l_leg_cap_hips_0": "ltibia",
+            "*l_leg_foot_0": "ltalus",
+            "*lchest_l_0": "upper_lumbar",
+            "*lchest_r_0": "upper_lumbar",
+            "*r_arm_cap_r_hand_0": "rradiusX",
+            "*r_arm_cap_torso_0": "rhumerusX",
+            "*r_arm_elbow_0": "rradius",
+            "*r_hand_0": "rhang_tag_bone",
+            "*r_hand_cap_r_arm_0": "rhand",
+            "*r_leg_calf_0": "rtibia",
+            "*r_leg_cap_hips_0": "rtibia",
+            "*r_leg_foot_0": "rtalus",
+            "*shldr_l_0": "lclavical",
+            "*shldr_r_0": "rclavical",
+            "*torso_cap_head_0": "cervical",
+            "*torso_cap_hips_0": "lower_lumbar",
+            "*torso_cap_l_arm_0": "lhumerusX",
+            "*torso_cap_r_arm_0": "rhumerusX",
+            "*uchest_l_0": "thoracic",
+            "*uchest_r_0": "thoracic",
+            "stupidtriangle_0": "pelvis",
+        }
+        
+        verts = [ # Every tag verts
+            [(-0.0569, 0.4202, 5.1881),(0.0041, 0.4202, 5.1881),(0.0041, 0.2861, 5.1881)],
+            [(0.0651, -0.0254, 5.0317),(0.0041, -0.0254, 5.0317),(0.0041, 0.1087, 5.0317)],
+            [(-0.0569, 0.4184, 6.3305),(0.0041, 0.4184, 6.3305),(0.0041, 0.2843, 6.3305)],
+            [(-0.0569, 0.0310, 5.8167),(0.0041, 0.0310, 5.8167),(0.0041, 0.0008, 5.9474)],
+            [(0.0651, -0.3286, 6.3079),(0.0041, -0.3286, 6.3079),(0.0041, -0.1944, 6.3079)],
+            [(0.0651, -0.4217, 6.0056),(0.0041, -0.4217, 6.0056),(0.0041, -0.2875, 6.0056)],
+            [(0.3107, 0.0177, 6.3193),(0.3107, -0.0433, 6.3193),(0.1765, -0.0433, 6.3193)],
+            [(-0.2774, -0.1043, 6.3193),(-0.2774, -0.0433, 6.3193),(-0.1432, -0.0433, 6.3193)],
+            [(0.0651, -0.0943, 6.6378),(0.0041, -0.0943, 6.6378),(0.0041, 0.0399, 6.6378)],
+            [(0.3253, 0.3359, 4.2369),(0.3781, 0.3054, 4.2369),(0.3110, 0.1892, 4.2369)],
+            [(-0.4227, 0.2749, 4.2369),(-0.3699, 0.3054, 4.2369),(-0.3028, 0.1892, 4.2369)],
+            [(0.3842, -0.3229, 4.1777),(0.3299, -0.3506, 4.1777),(0.2690, -0.2311, 4.1777)],
+            [(-0.2674, -0.3783, 4.1777),(-0.3217, -0.3506, 4.1777),(-0.2608, -0.2311, 4.1777)],
+            [(0.4977, -0.0253, 4.1846),(0.4871, -0.0853, 4.1846),(0.3563, -0.0623, 4.1659)],
+            [(-0.4849, -0.1460, 4.1573),(-0.4954, -0.0860, 4.1573),(-0.3646, -0.0629, 4.1386)],
+            [(0.8993, 0.1805, 1.6666),(0.8432, 0.1805, 1.6428),(0.7908, 0.1805, 1.7663)],
+            [(-0.7789, 0.1805, 1.6190),(-0.8350, 0.1805, 1.6428),(-0.7826, 0.1805, 1.7663)],
+            [(0.0605, 0.0214, 4.1647),(-0.0005, 0.0214, 4.1647),(-0.0005, 0.0354, 4.0313)],
+            [(0.7807, -0.0067, 2.1210),(0.7218, -0.0067, 2.1052),(0.7218, 0.1274, 2.1052)],
+            [(-0.6549, -0.0068, 2.0895),(-0.7138, -0.0068, 2.1053),(-0.7138, 0.1274, 2.1053)],
+            [(1.8660, 0.1020, 4.0128),(1.8659, 0.0410, 4.0133),(1.7701, 0.0419, 4.1072)],
+            [(0.7759, 0.0168, 5.1949),(0.7756, 0.0778, 5.1951),(0.8704, 0.0785, 5.1002)],
+            [(1.2802, 0.1889, 4.6768),(1.3229, 0.1892, 4.6333),(1.3235, 0.0551, 4.6329)],
+            [(2.0674, -0.0028, 3.8461),(2.0117, -0.0102, 3.8343),(1.9579, 0.0060, 3.8952)],
+            [(1.8941, -0.0408, 3.9921),(1.8942, 0.0202, 3.9918),(1.9900, 0.0193, 3.9449)],
+            [(1.0028, 0.2746, 1.9321),(1.0186, 0.2157, 1.9321),(0.8934, 0.1821, 1.9009)],
+            [(0.7747, 0.1839, 1.8482),(0.8300, 0.1839, 1.8714),(0.8866, 0.1839, 1.7620)],
+            [(1.2792, -0.0651, 0.7125),(1.2213, -0.0699, 0.6959),(1.1805, -0.0704, 0.8109)],
+            [(0.3201, -0.3678, 4.7277),(0.2630, -0.3887, 4.7328),(0.2178, -0.2627, 4.7418)],
+            [(-0.1978, -0.4403, 4.7379),(-0.2549, -0.4195, 4.7328),(-0.2096, -0.2935, 4.7418)],
+            [(-1.8582, -0.0211, 4.0136),(-1.8582, 0.0398, 4.0136),(-1.7633, 0.0398, 4.1084)],
+            [(-0.7680, 0.1400, 5.1951),(-0.7680, 0.0790, 5.1951),(-0.8629, 0.0790, 5.1003)],
+            [(-1.3696, 0.1870, 4.5908),(-1.3264, 0.1870, 4.6339),(-1.3264, 0.0529, 4.6339)],
+            [(-1.9478, -0.0177, 3.6719),(-2.0035, -0.0102, 3.6956),(-1.9497, 0.0060, 3.8174)],
+            [(-1.8941, -0.0408, 3.9921),(-1.8942, 0.0202, 3.9918),(-1.9900, 0.0193, 3.9449)],
+            [(-1.0183, 0.1568, 1.9321),(-1.0026, 0.2157, 1.9321),(-0.8774, 0.1821, 1.9008)],
+            [(-0.8775, 0.1839, 1.8937),(-0.8218, 0.1839, 1.8714),(-0.8763, 0.1839, 1.7611)],
+            [(-1.1623, -0.0719, 0.6831),(-1.2206, -0.0675, 0.6989),(-1.1818, -0.0675, 0.8145)],
+            [(0.6433, -0.1271, 5.4083),(0.5845, -0.1300, 5.4240),(0.5541, -0.0422, 5.3273)],
+            [(-0.5555, -0.1342, 5.4398),(-0.6144, -0.1315, 5.4240),(-0.5843, -0.0435, 5.3273)],
+            [(0.0651, 0.0364, 5.7931),(0.0041, 0.0364, 5.7931),(0.0041, 0.0666, 5.6624)],
+            [(-0.0569, -0.0030, 4.2077),(0.0041, -0.0030, 4.2077),(0.0041, -0.0170, 4.3411)],
+            [(0.7738, 0.1338, 5.1968),(0.7741, 0.0729, 5.1966),(0.6793, 0.0721, 5.2915)],
+            [(-0.7665, 0.0132, 5.1966),(-0.7665, 0.0741, 5.1966),(-0.6717, 0.0741, 5.2915)],
+            [(0.3757, -0.3544, 5.1514),(0.3168, -0.3648, 5.1633),(0.2879, -0.2377, 5.1314)],
+            [(-0.2497, -0.3752, 5.1751),(-0.3086, -0.3648, 5.1633),(-0.2798, -0.2377, 5.1314)],
+            [(0.3822, -2.4771, 49.6112),(-0.1298, -1.3507, 49.6112),(-0.1298, -2.4771, 49.6112)]
+        ]
+        
+        edges = []
+        faces = [[0, 1, 2]] 
+        
+        for number in range(47): # 46 tags
+            
+            if tags[number] not in bpy.data.objects:
+                
+                mesh = bpy.data.meshes.new(tags[number])
+                obj = bpy.data.objects.new(tags[number], mesh)
+                mesh.from_pydata(verts[number], edges, faces) # Create Tag
+                
+                bpy.context.scene.collection.objects.link(obj) # Make the Tag visible
+                
+                obj.modifiers.new(name="Armature", type='ARMATURE')
+                obj.modifiers["Armature"].object = bpy.data.objects["skeleton_root"]
+                
+                obj.vertex_groups.new(name=groups[obj.name]) # Adds a vertex group
+                obj.vertex_groups.active.add([0, 1, 2], 1.0, 'ADD') # Assign weight
+                obj.g2_prop_tag = True # Set g2_prop_tag to True
+                print(obj.name + " created.")
+
+
+################################################################################################
+##                                                                                            ##
+##                                DELETE EMPTY VERTEX_GROUPS                                  ##
+##                                                                                            ##
+################################################################################################
+
+class OBJECT_OT_EmptyVertexGroupDelete(bpy.types.Operator):
+    """ Delete all unused vertex groups per object """
+    bl_idname = "empty_vertex_groups.delete"
+    bl_label = "Delete Empty Vertex Groups"
+
+    def execute(self, context):
+        
+        # Loop through all objects in the scene
+        for object in bpy.data.objects:
+        # Check if the object is a mesh
+            if object.type == 'MESH':
+                # Remove empty vertex groups from the object
+                remove_empty_vertex_groups(object)
+        
+        return {'FINISHED'}
+    
+    def remove_empty_vertex_groups(obj):
+        # Get the vertex groups of the object
+        vertex_groups = obj.vertex_groups
+
+        # List to store empty vertex group names
+        empty_groups = []
+
+        # Iterate over vertex groups
+        for group in vertex_groups:
+            try:
+                # Check if any vertex is assigned to this group
+                if not any(vertex.groups for vertex in obj.data.vertices if group.index in [vg.group for vg in vertex.groups]):
+                    empty_groups.append(group.name)
+            except AttributeError:
+                empty_groups.append(group.name)
+
+        # Remove empty vertex groups
+        for group_name in empty_groups:
+            obj.vertex_groups.remove(obj.vertex_groups[group_name])
+       
 
 ################################################################################################
 ##                                                                                            ##
@@ -100,7 +335,7 @@ class AddonProperties(bpy.types.PropertyGroup):
 class OBJECT_OT_BodyParent(bpy.types.Operator):
     """ Parent all body parts if naming convention is respected """
     bl_idname = "body.parent"
-    bl_label = "Body"
+    bl_label = "Parent Body Parts"
 
     def execute(self, context):
         
@@ -111,7 +346,7 @@ class OBJECT_OT_BodyParent(bpy.types.Operator):
         
         for object in bpy.data.objects:       
             
-            if "_cap_" in object.name or object.g2_prop_tag or "scene_root" in object.name:
+            if "_cap_" in object.name or object.name.startswith("*") or "scene_root" in object.name:
                 continue
             
             object.parent = bpy.data.objects[OBJECT_OT_BodyParent.parent(object)]
@@ -150,6 +385,7 @@ class OBJECT_OT_BodyParent(bpy.types.Operator):
                 return f"model_root_{getLOD(object)}" 
         
         if object.name.startswith("l_") or object.name.startswith("r_"):
+            print(object.name)
             return parts.get("_".join(object.name.split("_", 2)[:2])) + "_" + getLOD(object)
         else:
             return object.name.split("_")[0] + "_" + getLOD(object)
@@ -163,7 +399,7 @@ class OBJECT_OT_BodyParent(bpy.types.Operator):
 class OBJECT_OT_CapParent(bpy.types.Operator):
     """ Parent all caps """
     bl_idname = "cap.parent"
-    bl_label = "Caps"
+    bl_label = "Parent Caps"
 
     def execute(self, context):
         
@@ -195,7 +431,7 @@ class OBJECT_OT_CapParent(bpy.types.Operator):
 class OBJECT_OT_TagParent(bpy.types.Operator):
     """ Parent all tags """
     bl_idname = "tag.parent"
-    bl_label = "Tags"
+    bl_label = "Parent Tags"
 
     def execute(self, context):
         
@@ -205,8 +441,8 @@ class OBJECT_OT_TagParent(bpy.types.Operator):
             return {'FINISHED'}
             
         for object in bpy.data.objects:  
-        
-            if object.g2_prop_tag == False:
+                
+            if "*" not in object.name:
                 continue
             
             object.parent = bpy.data.objects[OBJECT_OT_TagParent.parent(object)]
@@ -264,10 +500,8 @@ class OBJECT_OT_TagParent(bpy.types.Operator):
             "*uchest_r": "torso"
         }
         
-        newObject = stripLOD(object)
-        
-        if newObject in tags:
-            return tags.get(newObject) + "_" + getLOD(object)
+        if stripLOD(object) in tags:
+            return tags.get(stripLOD(object)) + "_" + getLOD(object)
     
 ################################################################################################
 ##                                                                                            ##
@@ -278,7 +512,7 @@ class OBJECT_OT_TagParent(bpy.types.Operator):
 class OBJECT_OT_VehicleParent(bpy.types.Operator):
     """ Parent objects, caps and tags from the vehicle """
     bl_idname = "vehicle.parent"
-    bl_label = "Parent Parts"
+    bl_label = "Assemble Vehicle"
 
     def execute(self, context):
         
@@ -428,12 +662,12 @@ class OBJECT_OT_CreateLODs(bpy.types.Operator):
     
     def execute(self, context): 
         for lod in (1,2,3):
-            verts = OBJECT_OT_CreateLODs.autoLOD(lod, bpy.context.scene.settings.angle_limit, bpy.context.scene.settings.delimit_item)   
+            verts = OBJECT_OT_CreateLODs.autoLOD(lod, bpy.context.scene.settings.angle_limit, bpy.context.scene.settings.delimit_item, bpy.context.scene.settings.boundaries)   
             self.report({'INFO'}, f"Created model_root_{getLOD(bpy.context.selected_objects[0])} with {verts} vertices.")
     
         return {'FINISHED'}       
 
-    def autoLOD(lod, maxLimit, mode="UV"):
+    def autoLOD(lod, maxLimit, mode, boundaries):
             
         bpy.ops.object.select_all(action='DESELECT') # We deselect everything
         
@@ -563,7 +797,9 @@ classes = [
     OBJECT_OT_CreateSkinfile,
     OBJECT_OT_VehicleParent,    
     OBJECT_OT_UnparentAll,
-    OBJECT_OT_CreateLODs
+    OBJECT_OT_CreateLODs,
+    OBJECT_OT_EmptyVertexGroupDelete,
+    OBJECT_OT_CreateTags
 ]
 
 if __name__ == "__main__":
