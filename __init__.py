@@ -67,7 +67,7 @@ class AddonProperties(bpy.types.PropertyGroup):
         default = "select folder to save file",
         description = "Model folder",
         maxlen = 1024,
-        subtype = "FILE_PATH"
+        subtype = "FILE_PATH",
     )
     
     angle_limit: bpy.props.FloatProperty(
@@ -301,7 +301,7 @@ class OBJECT_OT_EmptyVertexGroupDelete(bpy.types.Operator):
         # Check if the object is a mesh
             if object.type == 'MESH':
                 # Remove empty vertex groups from the object
-                remove_empty_vertex_groups(object)
+                OBJECT_OT_EmptyVertexGroupDelete.remove_empty_vertex_groups(object)
         
         return {'FINISHED'}
     
@@ -525,7 +525,7 @@ class OBJECT_OT_VehicleParent(bpy.types.Operator):
             if "scene" in object.name:
                 continue
             
-            object.parent = bpy.data.objects[parentVehicle(object) + "_" + getLOD(object)]
+            object.parent = bpy.data.objects[OBJECT_OT_VehicleParent.parentVehicle(object) + "_" + getLOD(object)]
         
         return {'FINISHED'} 
     
