@@ -67,7 +67,7 @@ class AddonProperties(bpy.types.PropertyGroup):
         default = "select folder to save file",
         description = "Model folder",
         maxlen = 1024,
-        subtype = "FILE_PATH",
+        subtype = "FILE_PATH"
     )
     
     angle_limit: bpy.props.FloatProperty(
