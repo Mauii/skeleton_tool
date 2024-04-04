@@ -1,11 +1,17 @@
 import bpy
-import jediacademy
+import jediacademy # This can get very fancy names, so it would be interesting to make a "try" on wonko functions
 import math
+import random
+
+# We will make a list of bones which will primarily assign objects
+assignbones = ["pelvis", "thoracic", "cervical", "face", "rradius", "rhand", "lradius", "lhand", "rtibia", "ltibia", "rtalus", "ltalus", "lower_lumbar", "rhumerus", "lhumerus"]
+assignnames = ["hips","torso","torso_upper","head","r_arm","r_hand","l_arm","l_hand","r_leg","l_leg","r_leg_foot","l_leg_foot","torso_lower","r_arm_shield","l_arm_shield"]
+# Had to rename _cap_ due to conflicting with the main addon
 
 bl_info = {
     "name": "Skeleton Tool",
     "author": "Maui",
-    "version": (2, 5),
+    "version": (3, 0), # Updating directly to 3.0 with our new great features and a video!
     "blender": (4, 1),
     "location": "Object Properties -> Skeleton Tool Panel",
     "description": "This addon has many features that decreases timewastes when preparing a model for JKA.",
@@ -14,30 +20,39 @@ bl_info = {
 
 class OBJECT_PT_SkeletonTool(bpy.types.Panel):
     """ Creates a Panel in the Object properties window """
-    bl_label = "Skeleton Tool"
+    bl_label = "Jedi Academy: Skeleton tool"
     bl_idname = "OBJECT_PT_Skeleton_Tool"
-    bl_space_type = 'PROPERTIES'
-    bl_region_type = 'WINDOW'
-    bl_context = "object"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_context = "objectmode"
+    bl_category = "Skeleton tool"
+    bl_options = {'DEFAULT_CLOSED'}
     
-    def draw(self, context):
+    def draw(self, context): 
+        ''' Sized box which can encompass all the buttons, could be more adjusted.
+        Keep parent buttons as different in the Playermodel tag; set create LODs within the function
+        and send create tags to misc and disabled cause it's not working'''
         layout = self.layout
+        
+        layout.ui_units_x = 14.0 
+        layout.ui_units_y = 14.0
+        
         settings = context.scene.settings
         obj = context.object
                
         box = layout.box() 
         box.label(text="Playermodel")
         
-        row = box.row()
-        row.operator("body.parent") 
-        row.operator("cap.parent") 
-        row.operator("tag.parent")
-        box.operator("tag.create")
-        box.operator("lod.create")    
+        box.operator("autosplitter.parent")
+        box.operator("autorenamer.parent")
+        box.operator("body.parent") 
+        box.operator("cap.parent") 
+        box.operator("tag.parent")
         
         box = layout.box() 
         row = box.row()
         box.label(text="Dissolve settings for LODs")
+        box.operator("lod.create")    
         box.prop(settings, "angle_limit")
         box.prop(settings, "delimit_item", expand=False)
         box.prop(settings, "boundaries")         
@@ -56,6 +71,7 @@ class OBJECT_PT_SkeletonTool(bpy.types.Panel):
               
         box = layout.box()
         box.label(text="Misc") 
+        #box.operator("tag.create")
         box.operator("remove.parent")
         box.operator("hierarchy.clean")
         box.operator("empty_vertex_groups.delete")
@@ -106,7 +122,7 @@ class OBJECT_OT_CreateTags(bpy.types.Operator):
 
     def execute(self, context):
         
-        OBJECT_OT_CreateTags.create(str(bpy.context.scene.settings.select_lod))
+        OBJECT_OT_CreateTags.create()
         
         return {'FINISHED'}
 
@@ -328,6 +344,155 @@ class OBJECT_OT_EmptyVertexGroupDelete(bpy.types.Operator):
 
 ################################################################################################
 ##                                                                                            ##
+##                                  AUTO SPLITTER                                             ##
+##                                                                                            ##
+################################################################################################
+
+def autoSplitter():
+    # Person must select one object
+    if len(bpy.context.selected_objects) != 1:
+        return print("You must only have one item selected and at least one")
+    obj = bpy.context.selected_objects[0]
+    obj.name = "body"
+    while obj.data.vertices:
+        bpy.ops.object.mode_set(mode='EDIT')
+        bpy.ops.mesh.select_mode(type="VERT")
+        bpy.ops.mesh.select_all(action='SELECT')
+        bpy.ops.mesh.remove_doubles() # We optimize removing doubles
+        bpy.ops.mesh.select_all(action='DESELECT')
+        randvert = obj.data.vertices[random.randint(0,len(obj.data.vertices)-1)]
+        randvert.select = True
+        #bpy.ops.mesh.select_random(ratio=0.001, seed=random.randint(0,100), action='SELECT')
+        bpy.ops.mesh.select_linked_pick(deselect=False, delimit={'SHARP'}, object_index=0, index=randvert.index)
+        try: # We also try on separating because if there aren't selected vertices will crash
+            bpy.ops.mesh.separate(type="SELECTED")
+        except:
+            pass
+        bpy.ops.object.mode_set(mode='OBJECT')
+        bpy.ops.object.select_all(action='DESELECT')
+        bpy.context.view_layer.objects.active = obj
+        obj.select_set(True)
+    else:
+        bpy.ops.object.delete()
+        print("Separation completed")
+
+class OBJECT_OT_AutoSplitter(bpy.types.Operator):
+    """ Auto split all meshes based on sharp edges by selecting linked, which will also separate loose meshes """
+    bl_idname = "autosplitter.parent"
+    bl_label = "Auto splitter"
+
+    def execute(self, context):
+        
+        autoSplitter()
+        return {'FINISHED'}
+
+################################################################################################
+##                                                                                            ##
+##                                  AUTO RENAMER                                              ##
+##                                                                                            ##
+################################################################################################
+
+def calculateBoundingBoxVolume(obj):
+    # Transform object vertices into world coordinates
+    vertices = [obj.matrix_world @ v.co for v in obj.data.vertices]
+
+    # Initialize minimum and maximum coordinates with extreme values
+    min_coords = [float('inf')] * 3
+    max_coords = [-float('inf')] * 3
+
+    # Update minimum and maximum coordinates
+    for vertex in vertices:
+        for i in range(3):
+            min_coords[i] = min(min_coords[i], vertex[i])
+            max_coords[i] = max(max_coords[i], vertex[i])
+
+    # Calculate the dimensions of the bounding box
+    dimensions = [max_coords[i] - min_coords[i] for i in range(3)]
+
+    # Calculate and return the volume of the bounding box
+    volume = math.prod(dimensions)
+    return volume
+
+def minValue(list): # Elements must be three dimensional (bone, obj, distance)
+    min_values = {}
+    for bone, obj, value in list:
+        if bone not in min_values or value < min_values[bone][0]:
+            min_values[bone] = (value, obj)
+    return min_values
+
+def maxValue(list): # Elements must be three dimensional (bone, obj, distance)
+    max_values = {}
+    for bone, obj, value in list:
+        if bone not in max_values or value > max_values[bone][0]:
+            max_values[bone] = (value, obj)
+    return max_values
+
+def setOrigin():
+    for object in bpy.data.objects: # We loop all objects
+        object.select_set(False) # Deselect all objects
+        if object.type == "MESH" and object.visible_get() is True: # If the modeller doesn't want to work with a mesh, hide it.
+            object.select_set(True)
+            bpy.ops.object.origin_set(type="ORIGIN_CENTER_OF_MASS")
+            object.select_set(False) # Select active, set origin to geometry and deselect
+
+
+def boneMeshDistance():
+    boneobjdistance = []
+    for bonename in assignbones: # We loop the selected bones
+        skeleton = bpy.data.objects["skeleton_root"] # Point directly to skeleton data
+        bone = skeleton.pose.bones[bonename] # Access to bone data.
+        if bonename == "rtibia" or "ltibia":
+            matrix_final_bone = skeleton.matrix_world @ bone.head
+        else:
+            matrix_final_bone = skeleton.matrix_world @ bone.center # Center determines midpoint between head and tail and after some matrices we have the world space location
+        for obj in bpy.data.objects: # We loop and exclude 1. visible objects and mesh (exclude armatures and plain axes); 2. tags; 3. caps; 4. stupids; 
+            if "_0" not in obj.name and obj.visible_get() is True and obj.type == "MESH" and "*" not in obj.name and "cap" not in obj.name and "stupidtriangle" not in obj.name:
+                matrix_final_object = obj.matrix_world.translation
+                distance = math.dist(matrix_final_bone, matrix_final_object) # We calculate world space object location and their distance to the world space location of bone
+                if distance < 1:
+                    volume = calculateBoundingBoxVolume(obj)/10
+                    boneobjdistance.append([bone.name,obj.name,distance-volume]) # We make a list with all bones included
+    return boneobjdistance
+
+def namingConventions():
+    usedobj = []
+    usedname = [0] * len(assignbones)
+    for level in (1, "a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z","aa","ab","ac","ad","ae","af","ag","ah","ai","al","am","an"): # We start a loop for first minimum and letters for the rest
+        minimumValue = minValue(boneMeshDistance())
+        for bone, (value, obj) in minimumValue.items(): # Evaluating minimum values
+            if obj in usedobj:
+                continue
+            for abone in assignbones:
+                if bone == abone:
+                    index = assignbones.index(abone)
+                    if usedname[index] == 0:
+                        bpy.data.objects[obj].name = assignnames[index] + "_0"
+                        usedname[index] = 1
+                    else:
+                        bpy.data.objects[obj].name = assignnames[index] + "_other{}_0".format(level)
+
+            usedobj.append(obj) # Adding used objects in current loop to avoid picking the same in level 1
+
+def autoRenamer():
+    try: # We use try function in case we are already in object mode
+        bpy.ops.object.mode_set(mode="OBJECT") # We enter object mode, because we are manipulating objects.
+    except:
+        pass
+    setOrigin()
+    namingConventions()
+
+class OBJECT_OT_AutoRenamer(bpy.types.Operator):
+    """ Auto rename all meshes based on bones and assigning further names """
+    bl_idname = "autorenamer.parent"
+    bl_label = "Auto renamer"
+
+    def execute(self, context):
+        
+        autoRenamer()
+        return {'FINISHED'}
+
+################################################################################################
+##                                                                                            ##
 ##                                  SET BODY PARENTING                                        ##
 ##                                                                                            ##
 ################################################################################################
@@ -335,7 +500,7 @@ class OBJECT_OT_EmptyVertexGroupDelete(bpy.types.Operator):
 class OBJECT_OT_BodyParent(bpy.types.Operator):
     """ Parent all body parts if naming convention is respected """
     bl_idname = "body.parent"
-    bl_label = "Parent Body Parts"
+    bl_label = "Parent Meshes"
 
     def execute(self, context):
         
@@ -349,7 +514,9 @@ class OBJECT_OT_BodyParent(bpy.types.Operator):
             if "_cap_" in object.name or object.name.startswith("*") or "scene_root" in object.name:
                 continue
             
+            matrixcopy = object.matrix_world.copy() 
             object.parent = bpy.data.objects[OBJECT_OT_BodyParent.parent(object)]
+            object.matrix_world = matrixcopy # We copy and put the matrix world before inheritance
         
         return {'FINISHED'}
        
@@ -385,7 +552,6 @@ class OBJECT_OT_BodyParent(bpy.types.Operator):
                 return f"model_root_{getLOD(object)}" 
         
         if object.name.startswith("l_") or object.name.startswith("r_"):
-            print(object.name)
             return parts.get("_".join(object.name.split("_", 2)[:2])) + "_" + getLOD(object)
         else:
             return object.name.split("_")[0] + "_" + getLOD(object)
@@ -412,8 +578,10 @@ class OBJECT_OT_CapParent(bpy.types.Operator):
             
             if object.g2_prop_tag or "_cap_" not in object.name or "scene_root" in object.name:
                 continue
-            
-            object.parent = bpy.data.objects[OBJECT_OT_CapParent.parent(object)]                
+                
+            matrixcopy = object.matrix_world.copy() 
+            object.parent = bpy.data.objects[OBJECT_OT_CapParent.parent(object)]    
+            object.matrix_world = matrixcopy # Same problem was found in caps         
             
         return {'FINISHED'}
     
@@ -444,8 +612,10 @@ class OBJECT_OT_TagParent(bpy.types.Operator):
                 
             if "*" not in object.name:
                 continue
-            
+                
+            matrixcopy = object.matrix_world.copy() 
             object.parent = bpy.data.objects[OBJECT_OT_TagParent.parent(object)]
+            object.matrix_world = matrixcopy # Same problem was found in tags  
         
         return {'FINISHED'} 
     
@@ -525,8 +695,10 @@ class OBJECT_OT_VehicleParent(bpy.types.Operator):
             if "scene" in object.name:
                 continue
             
+            matrixcopy = object.matrix_world.copy() 
             object.parent = bpy.data.objects[OBJECT_OT_VehicleParent.parentVehicle(object) + "_" + getLOD(object)]
-        
+            object.matrix_world = matrixcopy # Can't test this, but we suppose it also messes up
+            
         return {'FINISHED'} 
     
     def parentVehicle(object):  
@@ -562,7 +734,9 @@ class OBJECT_OT_UnparentAll(bpy.types.Operator):
     def execute(self, context):
         
         for object in bpy.data.objects:
+            matrixcopy = object.matrix_world.copy()
             object.parent = None 
+            object.matrix_world = matrixcopy # We do the same when un-parenting
         
         return {'FINISHED'} 
     
@@ -592,7 +766,7 @@ class OBJECT_OT_Clean(bpy.types.Operator):
 ##                                                                                            ##
 ################################################################################################
     
-class OBJECT_OT_CreateSkinfile(bpy.types.Operator):
+class OBJECT_OT_CreateSkinFile(bpy.types.Operator):
     """Create model_default.skin file"""
     bl_idname = "file.create_skin"
     bl_label = "Create .SKIN"
@@ -742,20 +916,20 @@ class OBJECT_OT_SetGhoul2Properties(bpy.types.Operator):
             OBJECT_OT_SetGhoul2Properties.setProperties(object)
     
         return {'FINISHED'}
-      
-    def setProperties(object):    
+    # Setting automatically object name as g_prop, off for caps and tag for *tags
+    def setProperties(object): 
                 
-        if "g2_prop_off" not in object:
-            object.g2_prop_off = False
-            
-        if "g2_prop_tag" not in object:
+        if "_cap_" in object.name:
+            object.g2_prop_off = True
             object.g2_prop_tag = False
             
-        if "g2_prop_name" not in object:
-            object.g2_prop_name = object.name.replace("_" + getLOD(object), "")
+        if "*" in object.name:
+            object.g2_prop_tag = True
+            object.g2_prop_off = False
             
-        if "g2_prop_shader" not in object:
-            object.g2_prop_shader = ""
+        object.g2_prop_name = object.name.replace("_" + getLOD(object), "")
+            
+        # Let people manually set shaders, if needed
 
 ################################################################################################
 ##                                                                                            ##
@@ -792,9 +966,11 @@ classes = [
     OBJECT_OT_BodyParent,
     OBJECT_OT_CapParent,
     OBJECT_OT_TagParent,
+    OBJECT_OT_AutoRenamer,
+    OBJECT_OT_AutoSplitter,
     OBJECT_OT_SetGhoul2Properties,
     OBJECT_OT_Clean,
-    OBJECT_OT_CreateSkinfile,
+    OBJECT_OT_CreateSkinFile,
     OBJECT_OT_VehicleParent,    
     OBJECT_OT_UnparentAll,
     OBJECT_OT_CreateLODs,
