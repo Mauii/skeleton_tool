@@ -11,12 +11,20 @@ assignnames = ["hips","torso","torso_upper","head","r_arm","r_hand","l_arm","l_h
 bl_info = {
     "name": "Skeleton Tool",
     "author": "Maui",
-    "version": (3, 0), # Updating directly to 3.0 with our new great features and a video!
+    "version": (3, 1), # Updating directly to 3.0 with our new great features and a video!
     "blender": (4, 1),
     "location": "Object Properties -> Skeleton Tool Panel",
     "description": "This addon has many features that decreases timewastes when preparing a model for JKA.",
     "category": "Modelling / Rigging",
 }
+
+def showMessage(message = "defaultMessage", title = "defaultTitle", icon = 'INFO'):
+    differentLines = message.split("\n")
+    def draw(self, context):
+        for line in differentLines:
+            self.layout.label(text=line)
+
+    bpy.context.window_manager.popup_menu(draw, title = title, icon = icon)
 
 class OBJECT_PT_SkeletonTool(bpy.types.Panel):
     """ Creates a Panel in the Object properties window """
@@ -57,9 +65,7 @@ class OBJECT_PT_SkeletonTool(bpy.types.Panel):
         box.prop(settings, "delimit_item", expand=False)
         box.prop(settings, "boundaries")         
         
-        box = layout.box()        
-        box.prop(settings, "folder_path")
-        
+        box = layout.box()                
         row = box.row()
         row.operator("g2.propset")
         row.operator("file.create_skin")
@@ -75,39 +81,8 @@ class OBJECT_PT_SkeletonTool(bpy.types.Panel):
         box.operator("remove.parent")
         box.operator("hierarchy.clean")
         box.operator("empty_vertex_groups.delete")
+        box.operator("automaterialcleaner.delete")
 
-class AddonProperties(bpy.types.PropertyGroup):
-        
-    folder_path: bpy.props.StringProperty(
-        name = "Save to",
-        default = "select folder to save file",
-        description = "Model folder",
-        maxlen = 1024,
-        subtype = "FILE_PATH",
-    )
-    
-    angle_limit: bpy.props.FloatProperty(
-        name = "Angle limit:",
-        default = 25
-    )
-    
-    delimit_item: bpy.props.EnumProperty(
-        name = "Dissolve as",
-        description = "sample text",
-        items = [
-            ('NORMAL', "Normal", "Dissolve on normal"),
-            ('MATERIAL', "Material", "Dissolve on material"),
-            ('SEAM', "Seam", "Dissolve on seam"),
-            ('SHARP', "Sharp", "Dissolve on sharp"),
-            ('UV', "UV", "Dissolve on uv")
-        ]
-    )
-    
-    boundaries: bpy.props.BoolProperty(
-        name = " -> use_dissolve_boundaries",
-        description = "Boundaries, either True or False",
-        default = False
-    )
 
 ################################################################################################
 ##                                                                                            ##
@@ -344,15 +319,49 @@ class OBJECT_OT_EmptyVertexGroupDelete(bpy.types.Operator):
 
 ################################################################################################
 ##                                                                                            ##
+##                             AUTO REMOVE UNUSED MATERIAL                                    ##
+##                                                                                            ##
+################################################################################################
+
+def autoMaterialCleaner(self):
+    for obj in bpy.data.objects:
+        material_indices = set()
+        if not obj.material_slots or not obj.type == "MESH":
+            continue
+        for f in obj.data.polygons:
+            material_indices.add(f.material_index)
+        for i in range(len(obj.material_slots) - 1, -1, -1):
+            if i not in material_indices:
+                try:
+                    obj.data.materials.pop(index=i)
+                except RuntimeError:
+                    self.report({"ERROR"}, "Index out of range. Did you clean already?")
+
+
+class OBJECT_OT_AutoMaterialCleaner(bpy.types.Operator):
+    """ Remove unused materials from all objects """
+    bl_idname = "automaterialcleaner.delete"
+    bl_label = "Material cleaner (unused from all objects)"
+
+    def execute(self, context):
+        
+        autoMaterialCleaner(self)
+        return {'FINISHED'}
+
+################################################################################################
+##                                                                                            ##
 ##                                  AUTO SPLITTER                                             ##
 ##                                                                                            ##
 ################################################################################################
 
-def autoSplitter():
+
+def autoSplitter(self):
     # Person must select one object
     if len(bpy.context.selected_objects) != 1:
-        return print("You must only have one item selected and at least one")
+        return self.report({"ERROR"}, "You must only have one item selected and at least one")
     obj = bpy.context.selected_objects[0]
+    if obj.type != "MESH":
+        return self.report({"ERROR"}, "Selected object must be a mesh")
     obj.name = "body"
     while obj.data.vertices:
         bpy.ops.object.mode_set(mode='EDIT')
@@ -374,7 +383,7 @@ def autoSplitter():
         obj.select_set(True)
     else:
         bpy.ops.object.delete()
-        print("Separation completed")
+        return self.report({"INFO"}, "Separation completed")
 
 class OBJECT_OT_AutoSplitter(bpy.types.Operator):
     """ Auto split all meshes based on sharp edges by selecting linked, which will also separate loose meshes """
@@ -383,8 +392,13 @@ class OBJECT_OT_AutoSplitter(bpy.types.Operator):
 
     def execute(self, context):
         
-        autoSplitter()
+        autoSplitter(self)
         return {'FINISHED'}
+    def invoke(self, context, event):
+        return context.window_manager.invoke_confirm(self, event, 
+        title='CAUTION', 
+        message="You must make sure that you have marked SHARP EDGES where you want the cuts and that you are not selecting too many objects (for optimal results)", 
+        confirm_text="Let's pray", icon='WARNING', text_ctxt='', translate=True)
 
 ################################################################################################
 ##                                                                                            ##
@@ -487,9 +501,13 @@ class OBJECT_OT_AutoRenamer(bpy.types.Operator):
     bl_label = "Auto renamer"
 
     def execute(self, context):
-        
         autoRenamer()
         return {'FINISHED'}
+    def invoke(self, context, event):
+        return context.window_manager.invoke_confirm(self, event, 
+        title='CAUTION', 
+        message='If you have already renamed or have more than LOD 0, this could lead to catastrophic naming results', 
+        confirm_text='Are you sure?', icon='WARNING', text_ctxt='', translate=True)
 
 ################################################################################################
 ##                                                                                            ##
@@ -520,6 +538,12 @@ class OBJECT_OT_BodyParent(bpy.types.Operator):
         
         return {'FINISHED'}
        
+    def invoke(self, context, event):
+        return context.window_manager.invoke_confirm(self, event, 
+        title='CAUTION', 
+        message="This one should work as a charm, but anyways, let me ask if you are sure about this", 
+        confirm_text="PARENT, C'MON!", icon='WARNING', text_ctxt='', translate=True)
+   
     def parent(object):              
   
         parts = {
@@ -585,7 +609,11 @@ class OBJECT_OT_CapParent(bpy.types.Operator):
             
         return {'FINISHED'}
     
-    
+    def invoke(self, context, event):
+        return context.window_manager.invoke_confirm(self, event, 
+        title='CAUTION', 
+        message="This one should work as a charm, but anyways, let me ask if you are sure about this", 
+        confirm_text="PARENT, C'MON!", icon='WARNING', text_ctxt='', translate=True)
     def parent(object):    
 
         return "_cap_".join(object.name.split("_cap_", 1)[:1]) + "_" + getLOD(object)  
@@ -619,6 +647,13 @@ class OBJECT_OT_TagParent(bpy.types.Operator):
         
         return {'FINISHED'} 
     
+  
+    def invoke(self, context, event):
+        return context.window_manager.invoke_confirm(self, event, 
+        title='CAUTION', 
+        message="This one should work as a charm, but anyways, let me ask if you are sure about this", 
+        confirm_text="PARENT, C'MON!", icon='WARNING', text_ctxt='', translate=True)
+  
     def parent(object):
     
         tags = {
@@ -771,14 +806,20 @@ class OBJECT_OT_CreateSkinFile(bpy.types.Operator):
     bl_idname = "file.create_skin"
     bl_label = "Create .SKIN"
     
+    folder_path : bpy.props.StringProperty(
+        name = "Save to",
+        default = "",
+        description = "Select the model in /models/players/name/",
+        maxlen = 1024,
+        subtype = "DIR_PATH"
+    )
+    shadername : bpy.props.StringProperty(name="Enter model name", default = "")
+    
     def execute(self, context): 
         
-        OBJECT_OT_CreateSkinFile.create() 
-    
-        return {'FINISHED'}
-    
-    def create():
-        file = open(bpy.context.scene.settings.folder_path + "\model_default.skin", "w")
+        path = bpy.path.abspath(self.folder_path)
+        shadername = self.shadername
+        file = open(path + "\model_default.skin", "w")
         
         exclude = (
             "scene_root", 
@@ -800,7 +841,10 @@ class OBJECT_OT_CreateSkinFile(bpy.types.Operator):
         caps = ""
         
         for object in bpy.data.objects:
-                    
+            
+            if object.type != "MESH" or object.active_material is None:
+                continue
+            
             if object.g2_prop_tag or object.name in exclude or object == None:
                 continue   
                     
@@ -813,16 +857,21 @@ class OBJECT_OT_CreateSkinFile(bpy.types.Operator):
                 caps = caps + object.g2_prop_name + "," + object.active_material.name.split(".tga")[0] + ".tga\n"
                 continue
             
+            
             if "Material" in object.active_material.name:
                 file.write(object.g2_prop_name + ",*off\n")
                 continue
                     
-            file.write(object.g2_prop_name + "," + object.active_material.name.split(".tga")[0] + ".tga\n")  
+            file.write(object.g2_prop_name + "," + "models/players/" + shadername + "/" + object.active_material.name.split(".tga")[0] + ".tga\n")  
 
         file.write("\n")
         file.write(caps)
         file.close()
-
+        return {'FINISHED'}
+    
+    def invoke(self,context,event):
+        return context.window_manager.invoke_props_dialog(self)
+    
 ################################################################################################
 ##                                                                                            ##
 ##                            CREATE NEW MODEL_ROOT HIERARCHIES                               ##
@@ -834,10 +883,35 @@ class OBJECT_OT_CreateLODs(bpy.types.Operator):
     bl_idname = "lod.create"
     bl_label = "Create LODs"
     
+    angle_limit: bpy.props.FloatProperty(
+        name = "Angle limit:",
+        default = 25
+    )
+    
+    delimit_item: bpy.props.EnumProperty(
+        name = "Dissolve as",
+        description = "sample text",
+        items = [
+            ('NORMAL', "Normal", "Dissolve on normal"),
+            ('MATERIAL', "Material", "Dissolve on material"),
+            ('SEAM', "Seam", "Dissolve on seam"),
+            ('SHARP', "Sharp", "Dissolve on sharp"),
+            ('UV', "UV", "Dissolve on uv")
+        ]
+    )
+    
+    boundaries: bpy.props.BoolProperty(
+        name = " -> use_dissolve_boundaries",
+        description = "Boundaries, either True or False",
+        default = False
+    )
+    
     def execute(self, context): 
+        lodInfo = ""
         for lod in (1,2,3):
-            verts = OBJECT_OT_CreateLODs.autoLOD(lod, bpy.context.scene.settings.angle_limit, bpy.context.scene.settings.delimit_item, bpy.context.scene.settings.boundaries)   
-            self.report({'INFO'}, f"Created model_root_{getLOD(bpy.context.selected_objects[0])} with {verts} vertices.")
+            verts = OBJECT_OT_CreateLODs.autoLOD(lod, self.angle_limit, self.delimit_item, self.boundaries)   
+            lodInfo = lodInfo + f"Created model_root_{getLOD(bpy.context.selected_objects[0])} with {verts} vertices.\n"
+        showMessage(lodInfo, "LOD resume", "INFO")
     
         return {'FINISHED'}       
 
@@ -975,7 +1049,8 @@ classes = [
     OBJECT_OT_UnparentAll,
     OBJECT_OT_CreateLODs,
     OBJECT_OT_EmptyVertexGroupDelete,
-    OBJECT_OT_CreateTags
+    OBJECT_OT_CreateTags,
+    OBJECT_OT_AutoMaterialCleaner
 ]
 
 if __name__ == "__main__":
