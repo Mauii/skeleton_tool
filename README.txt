@@ -1,4 +1,4 @@
-			Author: Maui				Addon version: 3.0	  					Blender version: 4.1
+			Author: Maui				Addon version: 3.1	  					Blender version: 4.1
 -----------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 INSTALLATION:
@@ -58,6 +58,8 @@ from LOD 3 which will take the Dissolve Limit angle towards model_root_1
 10. Clean duplicates of existing meshes.
 
 11. Delete empty vertex group. Very useful when you have weighted the whole model from a main mesh and then separate it; it will remove unused vertex groups not affecting the mesh.
+
+12. Added an option in MISC to remove all objects unused material slots.
 
 =======================================================================================================================================================================
 
