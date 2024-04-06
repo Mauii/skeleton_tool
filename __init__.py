@@ -18,13 +18,6 @@ bl_info = {
     "category": "Modelling / Rigging",
 }
 
-def showMessage(message = "defaultMessage", title = "defaultTitle", icon = 'INFO'):
-    differentLines = message.split("\n")
-    def draw(self, context):
-        for line in differentLines:
-            self.layout.label(text=line)
-
-    bpy.context.window_manager.popup_menu(draw, title = title, icon = icon)
 
 class OBJECT_PT_SkeletonTool(bpy.types.Panel):
     """ Creates a Panel in the Object properties window """
@@ -63,7 +56,7 @@ class OBJECT_PT_SkeletonTool(bpy.types.Panel):
         box.operator("lod.create")    
         box.prop(settings, "angle_limit")
         box.prop(settings, "delimit_item", expand=False)
-        box.prop(settings, "boundaries")         
+        box.prop(settings, "boundaries")
         
         box = layout.box()                
         row = box.row()
@@ -83,6 +76,38 @@ class OBJECT_PT_SkeletonTool(bpy.types.Panel):
         box.operator("empty_vertex_groups.delete")
         box.operator("automaterialcleaner.delete")
 
+
+class AddonProperties(bpy.types.PropertyGroup):
+    angle_limit: bpy.props.FloatProperty(
+        name = "Angle limit:",
+        default = 25
+    )
+    
+    delimit_item: bpy.props.EnumProperty(
+        name = "Dissolve as",
+        description = "sample text",
+        items = [
+            ('NORMAL', "Normal", "Dissolve on normal"),
+            ('MATERIAL', "Material", "Dissolve on material"),
+            ('SEAM', "Seam", "Dissolve on seam"),
+            ('SHARP', "Sharp", "Dissolve on sharp"),
+            ('UV', "UV", "Dissolve on uv")
+        ]
+    )
+    
+    boundaries: bpy.props.BoolProperty(
+        name = " -> use_dissolve_boundaries",
+        description = "Boundaries, either True or False",
+        default = False
+    )
+
+def showMessage(message = "defaultMessage", title = "defaultTitle", icon = 'INFO'):
+    differentLines = message.split("\n")
+    def draw(self, context):
+        for line in differentLines:
+            self.layout.label(text=line)
+
+    bpy.context.window_manager.popup_menu(draw, title = title, icon = icon)
 
 ################################################################################################
 ##                                                                                            ##
@@ -883,33 +908,11 @@ class OBJECT_OT_CreateLODs(bpy.types.Operator):
     bl_idname = "lod.create"
     bl_label = "Create LODs"
     
-    angle_limit: bpy.props.FloatProperty(
-        name = "Angle limit:",
-        default = 25
-    )
-    
-    delimit_item: bpy.props.EnumProperty(
-        name = "Dissolve as",
-        description = "sample text",
-        items = [
-            ('NORMAL', "Normal", "Dissolve on normal"),
-            ('MATERIAL', "Material", "Dissolve on material"),
-            ('SEAM', "Seam", "Dissolve on seam"),
-            ('SHARP', "Sharp", "Dissolve on sharp"),
-            ('UV', "UV", "Dissolve on uv")
-        ]
-    )
-    
-    boundaries: bpy.props.BoolProperty(
-        name = " -> use_dissolve_boundaries",
-        description = "Boundaries, either True or False",
-        default = False
-    )
-    
-    def execute(self, context): 
+    def execute(self, context):
         lodInfo = ""
+        bpy.context.scene.settings = settings
         for lod in (1,2,3):
-            verts = OBJECT_OT_CreateLODs.autoLOD(lod, self.angle_limit, self.delimit_item, self.boundaries)   
+            verts = OBJECT_OT_CreateLODs.autoLOD(lod, settings.angle_limit, settings.delimit_item, settings.boundaries)   
             lodInfo = lodInfo + f"Created model_root_{getLOD(bpy.context.selected_objects[0])} with {verts} vertices.\n"
         showMessage(lodInfo, "LOD resume", "INFO")
     
@@ -1027,13 +1030,12 @@ def stripLOD(object):
 def register(): 
     for cls in classes:
         bpy.utils.register_class(cls)
-    bpy.types.Scene.settings = bpy.props.PointerProperty(type=AddonProperties)   
-   
+    bpy.types.Scene.settings = bpy.props.PointerProperty(type=AddonProperties)  
 def unregister():
     for cls in classes:
         bpy.utils.unregister_class(cls)
     del bpy.types.Scene.settings
-
+ 
 classes = [
     AddonProperties,
     OBJECT_PT_SkeletonTool,
