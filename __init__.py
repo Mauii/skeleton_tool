@@ -321,6 +321,12 @@ class OBJECT_OT_EmptyVertexGroupDelete(bpy.types.Operator):
         
         return {'FINISHED'}
     
+    def invoke(self, context, event):
+        return context.window_manager.invoke_confirm(self, event, 
+        title='CAUTION', 
+        message="This will remove empty vertex groups, ideal after splitting a weighted mesh", 
+        confirm_text="YES!", icon='WARNING', text_ctxt='', translate=True)
+
     def remove_empty_vertex_groups(obj):
         # Get the vertex groups of the object
         vertex_groups = obj.vertex_groups
@@ -373,6 +379,11 @@ class OBJECT_OT_AutoMaterialCleaner(bpy.types.Operator):
         autoMaterialCleaner(self)
         return {'FINISHED'}
 
+    def invoke(self, context, event):
+        return context.window_manager.invoke_confirm(self, event, 
+        title='CAUTION', 
+        message="This will remove all MESH unused material slots (a.k.a: textures)", 
+        confirm_text="Okay", icon='WARNING', text_ctxt='', translate=True)
 ################################################################################################
 ##                                                                                            ##
 ##                                  AUTO SPLITTER                                             ##
@@ -797,6 +808,12 @@ class OBJECT_OT_UnparentAll(bpy.types.Operator):
             matrixcopy = object.matrix_world.copy()
             object.parent = None 
             object.matrix_world = matrixcopy # We do the same when un-parenting
+            
+    def invoke(self, context, event):
+        return context.window_manager.invoke_confirm(self, event, 
+        title='CAUTION', 
+        message="This will unparent all objects. Are you REALLY sure?", 
+        confirm_text="YES, GO!", icon='WARNING', text_ctxt='', translate=True)
         
         return {'FINISHED'} 
     
@@ -817,6 +834,12 @@ class OBJECT_OT_Clean(bpy.types.Operator):
             if ".00" in object.name:
                 object.select_set(True)
                 bpy.ops.object.delete(use_global=True, confirm=True)
+                
+    def invoke(self, context, event):
+        return context.window_manager.invoke_confirm(self, event, 
+        title='CAUTION', 
+        message="This will lean duplicates, understood as .00 in object name", 
+        confirm_text="REMOVE!", icon='WARNING', text_ctxt='', translate=True)
         
         return {'FINISHED'}
 
@@ -865,6 +888,8 @@ class OBJECT_OT_CreateSkinFile(bpy.types.Operator):
         
         caps = ""
         
+        fiveLines = ""
+        index = 0
         for object in bpy.data.objects:
             
             if object.type != "MESH" or object.active_material is None:
@@ -886,12 +911,18 @@ class OBJECT_OT_CreateSkinFile(bpy.types.Operator):
             if "Material" in object.active_material.name:
                 file.write(object.g2_prop_name + ",*off\n")
                 continue
-                    
-            file.write(object.g2_prop_name + "," + "models/players/" + shadername + "/" + object.active_material.name.split(".tga")[0] + ".tga\n")  
+            
+            stringtowrite = object.g2_prop_name + "," + "models/players/" + shadername + "/" + object.active_material.name.split(".tga")[0] + ".tga\n"
+            if index < 6:
+                fiveLines = fiveLines + stringtowrite
+                index += 1
+            file.write(stringtowrite)  
 
         file.write("\n")
         file.write(caps)
         file.close()
+        fiveLines = fiveLines + f"Written in path {path}"
+        showMessage(fiveLines, "model_default.skin created, showing first 5 lines", "INFO")
         return {'FINISHED'}
     
     def invoke(self,context,event):
@@ -910,13 +941,19 @@ class OBJECT_OT_CreateLODs(bpy.types.Operator):
     
     def execute(self, context):
         lodInfo = ""
-        bpy.context.scene.settings = settings
+        settings = bpy.context.scene.settings
         for lod in (1,2,3):
             verts = OBJECT_OT_CreateLODs.autoLOD(lod, settings.angle_limit, settings.delimit_item, settings.boundaries)   
             lodInfo = lodInfo + f"Created model_root_{getLOD(bpy.context.selected_objects[0])} with {verts} vertices.\n"
         showMessage(lodInfo, "LOD resume", "INFO")
     
         return {'FINISHED'}       
+
+    def invoke(self, context, event):
+        return context.window_manager.invoke_confirm(self, event, 
+        title='CAUTION', 
+        message="LOD create will make the following: take LOD 0 to make LOD 3 by dissolve limit, 1/2 for LOD 2 and 1/5 for LOD 3, continue?", 
+        confirm_text="DO IT!", icon='WARNING', text_ctxt='', translate=True)
 
     def autoLOD(lod, maxLimit, mode, boundaries):
             
@@ -993,6 +1030,12 @@ class OBJECT_OT_SetGhoul2Properties(bpy.types.Operator):
             OBJECT_OT_SetGhoul2Properties.setProperties(object)
     
         return {'FINISHED'}
+        
+    def invoke(self, context, event):
+        return context.window_manager.invoke_confirm(self, event, 
+        title='CAUTION', 
+        message="By proceeding, you will get g2_prop_name as their object name, tags set to tag and caps set to off", 
+        confirm_text="DO IT!", icon='WARNING', text_ctxt='', translate=True)
     # Setting automatically object name as g_prop, off for caps and tag for *tags
     def setProperties(object): 
                 
