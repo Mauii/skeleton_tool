@@ -67,7 +67,6 @@ class OBJECT_PT_SkeletonTool(bpy.types.Panel):
         box.label(text="Vehicles")
         box.operator("vehicle.parent")
         
-              
         box = layout.box()
         box.label(text="Misc") 
         #box.operator("tag.create")
@@ -75,6 +74,14 @@ class OBJECT_PT_SkeletonTool(bpy.types.Panel):
         box.operator("hierarchy.clean")
         box.operator("empty_vertex_groups.delete")
         box.operator("automaterialcleaner.delete")
+        
+        box = layout.box()
+        box.label(text="Select") 
+        box.operator("g2.select")
+        box.prop(settings, "meshes")
+        box.prop(settings, "caps")
+        box.prop(settings, "tags")
+        
 
 
 class AddonProperties(bpy.types.PropertyGroup):
@@ -85,7 +92,7 @@ class AddonProperties(bpy.types.PropertyGroup):
     
     delimit_item: bpy.props.EnumProperty(
         name = "Dissolve as",
-        description = "sample text",
+        description = "Dissolve solution",
         items = [
             ('NORMAL', "Normal", "Dissolve on normal"),
             ('MATERIAL', "Material", "Dissolve on material"),
@@ -100,6 +107,11 @@ class AddonProperties(bpy.types.PropertyGroup):
         description = "Boundaries, either True or False",
         default = False
     )
+    
+    meshes : bpy.props.BoolProperty(name="Meshes",default=False)
+    caps : bpy.props.BoolProperty(name="Caps",default=False)
+    tags : bpy.props.BoolProperty(name="Tags",default=False)
+    
 
 def showMessage(message = "defaultMessage", title = "defaultTitle", icon = 'INFO'):
     differentLines = message.split("\n")
@@ -591,30 +603,25 @@ class OBJECT_OT_BodyParent(bpy.types.Operator):
             "l_hand": "l_arm",
             "r_hand": "r_arm",
             "head": "torso",
-            "hips": ""
+            "hips": "stupidtriangle_off",
+            "stupidtriangle_off": "model_root",
         }
-      
-        if "skeleton_root" in object.name or "model_root" in object.name:
+        
+        
+        if "model_root" in object.name or "skeleton_root" in object.name:
             return "scene_root"
         
-        if "stupidtriangle" in object.name or "stupidtriangle_off" in object.name:
-            return f"model_root_{getLOD(object)}"
+        strippedObj = stripLOD(object)    
         
-        if bpy.data.objects.get(f"stupidtriangle_{getLOD(object)}"):
-            parts["hips"] = "stupidtriangle"
-        else:
-            parts["hips"] = "stupidtriangle_off"
-        
-        if len(object.name.split("_")) == 2:
-            if stripLOD(object) in parts:
-                return f"{parts.get(stripLOD(object))}_{getLOD(object)}"
-            else:
-                return f"model_root_{getLOD(object)}" 
-        
-        if object.name.startswith("l_") or object.name.startswith("r_"):
-            return parts.get("_".join(object.name.split("_", 2)[:2])) + "_" + getLOD(object)
-        else:
-            return object.name.split("_")[0] + "_" + getLOD(object)
+        for item in parts.keys():
+            print(item)
+            if strippedObj == item:
+                return f"{parts.get(strippedObj)}_{getLOD(object)}"
+            elif item in strippedObj:
+                return f"{item}_{getLOD(object)}"
+        return f"hips_{getLOD(object)}"
+      
+  
 
 ################################################################################################
 ##                                                                                            ##
@@ -743,6 +750,7 @@ class OBJECT_OT_TagParent(bpy.types.Operator):
         
         if stripLOD(object) in tags:
             return tags.get(stripLOD(object)) + "_" + getLOD(object)
+        return "hips_" + getLOD(object)
     
 ################################################################################################
 ##                                                                                            ##
@@ -912,7 +920,16 @@ class OBJECT_OT_CreateSkinFile(bpy.types.Operator):
                 file.write(object.g2_prop_name + ",*off\n")
                 continue
             
-            stringtowrite = object.g2_prop_name + "," + "models/players/" + shadername + "/" + object.active_material.name.split(".tga")[0] + ".tga\n"
+            if "/" in object.active_material.name:
+                lastItem = object.active_material.name.split("/")[-1]
+            else:
+                lastItem = object.active_material.name
+            
+            if "." in lastItem:
+                lastItem = lastItem
+            else:
+                lastItem = lastItem + ".tga"
+            stringtowrite = object.g2_prop_name + "," + "models/players/" + shadername + "/" + lastItem + "\n"
             if index < 6:
                 fiveLines = fiveLines + stringtowrite
                 index += 1
@@ -1048,9 +1065,40 @@ class OBJECT_OT_SetGhoul2Properties(bpy.types.Operator):
             object.g2_prop_off = False
             
         object.g2_prop_name = object.name.replace("_" + getLOD(object), "")
+        object.g2_prop_shader = ""
             
         # Let people manually set shaders, if needed
 
+
+class OBJECT_OT_SelectOnlyMeshes(bpy.types.Operator):
+    bl_idname = "g2.select"
+    bl_label = "Model part select"
+    
+    def execute(self, context): 
+        bpy.ops.object.select_all(action='DESELECT')
+        settings = bpy.context.scene.settings
+            
+        for obj in bpy.data.objects:
+            if "skeleton_root" in obj.name or "model_root" in obj.name or "stupidtriangle" in obj.name or "scene_root" in obj.name:
+                continue
+            if settings.meshes and "*" not in obj.name and "cap" not in obj.name:
+                obj.select_set(True)
+            if settings.tags and ("*" in obj.name):
+                obj.select_set(True)
+            if settings.caps and ("cap" in obj.name) and ("*" not in obj.name):
+                obj.select_set(True)
+        
+
+    
+        return {'FINISHED'}
+    
+    def invoke(self, context, event):
+        return context.window_manager.invoke_confirm(self, event, 
+        title='CAUTION', 
+        message="You are going to select some parts, are you sure?", 
+        confirm_text="Sure!", icon='WARNING', text_ctxt='', translate=True)
+        
+    
 ################################################################################################
 ##                                                                                            ##
 ##                                      LOD FUNCTIONS                                         ##
@@ -1095,7 +1143,8 @@ classes = [
     OBJECT_OT_CreateLODs,
     OBJECT_OT_EmptyVertexGroupDelete,
     OBJECT_OT_CreateTags,
-    OBJECT_OT_AutoMaterialCleaner
+    OBJECT_OT_AutoMaterialCleaner,
+    OBJECT_OT_SelectOnlyMeshes
 ]
 
 if __name__ == "__main__":
