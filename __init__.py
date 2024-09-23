@@ -562,13 +562,15 @@ class OBJECT_OT_CreateSkinFile(bpy.types.Operator):
         subtype = "DIR_PATH"
     )
     
-    shadername: bpy.props.StringProperty(name="Enter model name", default = "")
+    shadername: bpy.props.StringProperty(name="Enter .skin name", default= "default")
+    modelname: bpy.props.StringProperty(name="Enter model name", default="")
     
     def execute(self, context): 
         
         path = bpy.path.abspath(self.folder_path)
         shadername = self.shadername
-        file = open(path + f"\{shadername}.skin", "w")
+        modelname = self.modelname
+        file = open(path + f"\model_{shadername}.skin", "w")
         exclude = (
             "scene_root", 
             "model_root_0",
@@ -619,7 +621,7 @@ class OBJECT_OT_CreateSkinFile(bpy.types.Operator):
             if "." not in lastItem:
                 lastItem = lastItem + ".tga"
                 
-            stringtowrite = object.g2_prop_name + "," + "models/players/" + shadername + "/" + lastItem + "\n"
+            stringtowrite = object.g2_prop_name + "," + "models/players/" + modelname + "/" + lastItem + "\n"
             
             if index < 6:
                 fiveLines = fiveLines + stringtowrite
