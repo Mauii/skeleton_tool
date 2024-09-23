@@ -193,7 +193,6 @@ class OBJECT_OT_CreateTags(bpy.types.Operator):
             "*torso_cap_r_arm_0": "rhumerusX",
             "*uchest_l_0": "thoracic",
             "*uchest_r_0": "thoracic",
-            "stupidtriangle_0": "pelvis",
         }
         
         verts = [ # Every tag verts
@@ -248,7 +247,7 @@ class OBJECT_OT_CreateTags(bpy.types.Operator):
         edges = []
         faces = [[0, 1, 2]] 
         
-        for number in range(47): # 46 tags
+        for number in range(46): # 45 tags
             
             if tags[number] not in bpy.data.objects:
                 
