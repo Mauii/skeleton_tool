@@ -1,18 +1,12 @@
 import bpy
 import jediacademy # This can get very fancy names, so it would be interesting to make a "try" on wonko functions
-import math
-import random
 
-# We will make a list of bones which will primarily assign objects
-assignbones = ["pelvis", "thoracic", "cervical", "face", "rradius", "rhand", "lradius", "lhand", "rtibia", "ltibia", "rtalus", "ltalus", "lower_lumbar", "rhumerus", "lhumerus"]
-assignnames = ["hips","torso","torso_upper","head","r_arm","r_hand","l_arm","l_hand","r_leg","l_leg","r_leg_foot","l_leg_foot","torso_lower","r_arm_shield","l_arm_shield"]
-# Had to rename _cap_ due to conflicting with the main addon
 
 bl_info = {
     "name": "Skeleton Tool",
     "author": "Maui",
     "version": (3, 1), # Updating directly to 3.0 with our new great features and a video!
-    "blender": (4, 1),
+    "blender": (4, 2),
     "location": "Object Properties -> Skeleton Tool Panel",
     "description": "This addon has many features that decreases timewastes when preparing a model for JKA.",
     "category": "Modelling / Rigging",
@@ -44,19 +38,10 @@ class OBJECT_PT_SkeletonTool(bpy.types.Panel):
         box = layout.box() 
         box.label(text="Playermodel")
         
-        box.operator("autosplitter.parent")
-        box.operator("autorenamer.parent")
         box.operator("body.parent") 
         box.operator("cap.parent") 
         box.operator("tag.parent")
-        
-        box = layout.box() 
-        row = box.row()
-        box.label(text="Dissolve settings for LODs")
-        box.operator("lod.create")    
-        box.prop(settings, "angle_limit")
-        box.prop(settings, "delimit_item", expand=False)
-        box.prop(settings, "boundaries")
+        box.operator("tag.create")
         
         box = layout.box()                
         row = box.row()
@@ -69,11 +54,8 @@ class OBJECT_PT_SkeletonTool(bpy.types.Panel):
         
         box = layout.box()
         box.label(text="Misc") 
-        #box.operator("tag.create")
         box.operator("remove.parent")
         box.operator("hierarchy.clean")
-        box.operator("empty_vertex_groups.delete")
-        box.operator("automaterialcleaner.delete")
         
         box = layout.box()
         box.label(text="Select") 
@@ -83,31 +65,7 @@ class OBJECT_PT_SkeletonTool(bpy.types.Panel):
         box.prop(settings, "tags")
         
 
-
-class AddonProperties(bpy.types.PropertyGroup):
-    angle_limit: bpy.props.FloatProperty(
-        name = "Angle limit:",
-        default = 25
-    )
-    
-    delimit_item: bpy.props.EnumProperty(
-        name = "Dissolve as",
-        description = "Dissolve solution",
-        items = [
-            ('NORMAL', "Normal", "Dissolve on normal"),
-            ('MATERIAL', "Material", "Dissolve on material"),
-            ('SEAM', "Seam", "Dissolve on seam"),
-            ('SHARP', "Sharp", "Dissolve on sharp"),
-            ('UV', "UV", "Dissolve on uv")
-        ]
-    )
-    
-    boundaries: bpy.props.BoolProperty(
-        name = " -> use_dissolve_boundaries",
-        description = "Boundaries, either True or False",
-        default = False
-    )
-    
+class AddonProperties(bpy.types.PropertyGroup): 
     meshes : bpy.props.BoolProperty(name="Meshes",default=False)
     caps : bpy.props.BoolProperty(name="Caps",default=False)
     tags : bpy.props.BoolProperty(name="Tags",default=False)
@@ -123,7 +81,7 @@ def showMessage(message = "defaultMessage", title = "defaultTitle", icon = 'INFO
 
 ################################################################################################
 ##                                                                                            ##
-##                                        CREATE TAGS                                         ##
+##                                        TAGS FUNCTIONS                                      ##
 ##                                                                                            ##
 ################################################################################################
 
@@ -134,11 +92,11 @@ class OBJECT_OT_CreateTags(bpy.types.Operator):
 
     def execute(self, context):
         
-        OBJECT_OT_CreateTags.create()
+        self.create()
         
         return {'FINISHED'}
 
-    def create():
+    def create(self):
         tags = { # Every tagname 
             0: "*back_0",
             1: "*chestg_0",
@@ -185,8 +143,7 @@ class OBJECT_OT_CreateTags(bpy.types.Operator):
             42: "*torso_cap_l_arm_0",
             43: "*torso_cap_r_arm_0",
             44: "*uchest_l_0",
-            45: "*uchest_r_0",
-            46: "stupidtriangle_0"
+            45: "*uchest_r_0"
         }
         
         groups = { # These are all the bones the tags are being parented to
@@ -285,8 +242,7 @@ class OBJECT_OT_CreateTags(bpy.types.Operator):
             [(0.7738, 0.1338, 5.1968),(0.7741, 0.0729, 5.1966),(0.6793, 0.0721, 5.2915)],
             [(-0.7665, 0.0132, 5.1966),(-0.7665, 0.0741, 5.1966),(-0.6717, 0.0741, 5.2915)],
             [(0.3757, -0.3544, 5.1514),(0.3168, -0.3648, 5.1633),(0.2879, -0.2377, 5.1314)],
-            [(-0.2497, -0.3752, 5.1751),(-0.3086, -0.3648, 5.1633),(-0.2798, -0.2377, 5.1314)],
-            [(0.3822, -2.4771, 49.6112),(-0.1298, -1.3507, 49.6112),(-0.1298, -2.4771, 49.6112)]
+            [(-0.2497, -0.3752, 5.1751),(-0.3086, -0.3648, 5.1633),(-0.2798, -0.2377, 5.1314)]
         ]
         
         edges = []
@@ -310,363 +266,6 @@ class OBJECT_OT_CreateTags(bpy.types.Operator):
                 obj.g2_prop_tag = True # Set g2_prop_tag to True
                 print(obj.name + " created.")
 
-
-################################################################################################
-##                                                                                            ##
-##                                DELETE EMPTY VERTEX_GROUPS                                  ##
-##                                                                                            ##
-################################################################################################
-
-class OBJECT_OT_EmptyVertexGroupDelete(bpy.types.Operator):
-    """ Delete all unused vertex groups per object """
-    bl_idname = "empty_vertex_groups.delete"
-    bl_label = "Delete Empty Vertex Groups"
-
-    def execute(self, context):
-        
-        # Loop through all objects in the scene
-        for object in bpy.data.objects:
-        # Check if the object is a mesh
-            if object.type == 'MESH':
-                # Remove empty vertex groups from the object
-                OBJECT_OT_EmptyVertexGroupDelete.remove_empty_vertex_groups(object)
-        
-        return {'FINISHED'}
-    
-    def invoke(self, context, event):
-        return context.window_manager.invoke_confirm(self, event, 
-        title='CAUTION', 
-        message="This will remove empty vertex groups, ideal after splitting a weighted mesh", 
-        confirm_text="YES!", icon='WARNING', text_ctxt='', translate=True)
-
-    def remove_empty_vertex_groups(obj):
-        # Get the vertex groups of the object
-        vertex_groups = obj.vertex_groups
-
-        # List to store empty vertex group names
-        empty_groups = []
-
-        # Iterate over vertex groups
-        for group in vertex_groups:
-            try:
-                # Check if any vertex is assigned to this group
-                if not any(vertex.groups for vertex in obj.data.vertices if group.index in [vg.group for vg in vertex.groups]):
-                    empty_groups.append(group.name)
-            except AttributeError:
-                empty_groups.append(group.name)
-
-        # Remove empty vertex groups
-        for group_name in empty_groups:
-            obj.vertex_groups.remove(obj.vertex_groups[group_name])
-       
-
-################################################################################################
-##                                                                                            ##
-##                             AUTO REMOVE UNUSED MATERIAL                                    ##
-##                                                                                            ##
-################################################################################################
-
-def autoMaterialCleaner(self):
-    for obj in bpy.data.objects:
-        material_indices = set()
-        if not obj.material_slots or not obj.type == "MESH":
-            continue
-        for f in obj.data.polygons:
-            material_indices.add(f.material_index)
-        for i in range(len(obj.material_slots) - 1, -1, -1):
-            if i not in material_indices:
-                try:
-                    obj.data.materials.pop(index=i)
-                except RuntimeError:
-                    self.report({"ERROR"}, "Index out of range. Did you clean already?")
-
-
-class OBJECT_OT_AutoMaterialCleaner(bpy.types.Operator):
-    """ Remove unused materials from all objects """
-    bl_idname = "automaterialcleaner.delete"
-    bl_label = "Material cleaner (unused from all objects)"
-
-    def execute(self, context):
-        
-        autoMaterialCleaner(self)
-        return {'FINISHED'}
-
-    def invoke(self, context, event):
-        return context.window_manager.invoke_confirm(self, event, 
-        title='CAUTION', 
-        message="This will remove all MESH unused material slots (a.k.a: textures)", 
-        confirm_text="Okay", icon='WARNING', text_ctxt='', translate=True)
-################################################################################################
-##                                                                                            ##
-##                                  AUTO SPLITTER                                             ##
-##                                                                                            ##
-################################################################################################
-
-
-def autoSplitter(self):
-    # Person must select one object
-    if len(bpy.context.selected_objects) != 1:
-        return self.report({"ERROR"}, "You must only have one item selected and at least one")
-    obj = bpy.context.selected_objects[0]
-    if obj.type != "MESH":
-        return self.report({"ERROR"}, "Selected object must be a mesh")
-    obj.name = "body"
-    while obj.data.vertices:
-        bpy.ops.object.mode_set(mode='EDIT')
-        bpy.ops.mesh.select_mode(type="VERT")
-        bpy.ops.mesh.select_all(action='SELECT')
-        bpy.ops.mesh.remove_doubles() # We optimize removing doubles
-        bpy.ops.mesh.select_all(action='DESELECT')
-        randvert = obj.data.vertices[random.randint(0,len(obj.data.vertices)-1)]
-        randvert.select = True
-        #bpy.ops.mesh.select_random(ratio=0.001, seed=random.randint(0,100), action='SELECT')
-        bpy.ops.mesh.select_linked_pick(deselect=False, delimit={'SHARP'}, object_index=0, index=randvert.index)
-        try: # We also try on separating because if there aren't selected vertices will crash
-            bpy.ops.mesh.separate(type="SELECTED")
-        except:
-            pass
-        bpy.ops.object.mode_set(mode='OBJECT')
-        bpy.ops.object.select_all(action='DESELECT')
-        bpy.context.view_layer.objects.active = obj
-        obj.select_set(True)
-    else:
-        bpy.ops.object.delete()
-        return self.report({"INFO"}, "Separation completed")
-
-class OBJECT_OT_AutoSplitter(bpy.types.Operator):
-    """ Auto split all meshes based on sharp edges by selecting linked, which will also separate loose meshes """
-    bl_idname = "autosplitter.parent"
-    bl_label = "Auto splitter"
-
-    def execute(self, context):
-        
-        autoSplitter(self)
-        return {'FINISHED'}
-    def invoke(self, context, event):
-        return context.window_manager.invoke_confirm(self, event, 
-        title='CAUTION', 
-        message="You must make sure that you have marked SHARP EDGES where you want the cuts and that you are not selecting too many objects (for optimal results)", 
-        confirm_text="Let's pray", icon='WARNING', text_ctxt='', translate=True)
-
-################################################################################################
-##                                                                                            ##
-##                                  AUTO RENAMER                                              ##
-##                                                                                            ##
-################################################################################################
-
-def calculateBoundingBoxVolume(obj):
-    # Transform object vertices into world coordinates
-    vertices = [obj.matrix_world @ v.co for v in obj.data.vertices]
-
-    # Initialize minimum and maximum coordinates with extreme values
-    min_coords = [float('inf')] * 3
-    max_coords = [-float('inf')] * 3
-
-    # Update minimum and maximum coordinates
-    for vertex in vertices:
-        for i in range(3):
-            min_coords[i] = min(min_coords[i], vertex[i])
-            max_coords[i] = max(max_coords[i], vertex[i])
-
-    # Calculate the dimensions of the bounding box
-    dimensions = [max_coords[i] - min_coords[i] for i in range(3)]
-
-    # Calculate and return the volume of the bounding box
-    volume = math.prod(dimensions)
-    return volume
-
-def minValue(list): # Elements must be three dimensional (bone, obj, distance)
-    min_values = {}
-    for bone, obj, value in list:
-        if bone not in min_values or value < min_values[bone][0]:
-            min_values[bone] = (value, obj)
-    return min_values
-
-def maxValue(list): # Elements must be three dimensional (bone, obj, distance)
-    max_values = {}
-    for bone, obj, value in list:
-        if bone not in max_values or value > max_values[bone][0]:
-            max_values[bone] = (value, obj)
-    return max_values
-
-def setOrigin():
-    for object in bpy.data.objects: # We loop all objects
-        object.select_set(False) # Deselect all objects
-        if object.type == "MESH" and object.visible_get() is True: # If the modeller doesn't want to work with a mesh, hide it.
-            object.select_set(True)
-            bpy.ops.object.origin_set(type="ORIGIN_CENTER_OF_MASS")
-            object.select_set(False) # Select active, set origin to geometry and deselect
-
-
-def boneMeshDistance():
-    boneobjdistance = []
-    for bonename in assignbones: # We loop the selected bones
-        skeleton = bpy.data.objects["skeleton_root"] # Point directly to skeleton data
-        bone = skeleton.pose.bones[bonename] # Access to bone data.
-        if bonename == "rtibia" or "ltibia":
-            matrix_final_bone = skeleton.matrix_world @ bone.head
-        else:
-            matrix_final_bone = skeleton.matrix_world @ bone.center # Center determines midpoint between head and tail and after some matrices we have the world space location
-        for obj in bpy.data.objects: # We loop and exclude 1. visible objects and mesh (exclude armatures and plain axes); 2. tags; 3. caps; 4. stupids; 
-            if "_0" not in obj.name and obj.visible_get() is True and obj.type == "MESH" and "*" not in obj.name and "cap" not in obj.name and "stupidtriangle" not in obj.name:
-                matrix_final_object = obj.matrix_world.translation
-                distance = math.dist(matrix_final_bone, matrix_final_object) # We calculate world space object location and their distance to the world space location of bone
-                if distance < 1:
-                    volume = calculateBoundingBoxVolume(obj)/10
-                    boneobjdistance.append([bone.name,obj.name,distance-volume]) # We make a list with all bones included
-    return boneobjdistance
-
-def namingConventions():
-    usedobj = []
-    usedname = [0] * len(assignbones)
-    for level in (1, "a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z","aa","ab","ac","ad","ae","af","ag","ah","ai","al","am","an"): # We start a loop for first minimum and letters for the rest
-        minimumValue = minValue(boneMeshDistance())
-        for bone, (value, obj) in minimumValue.items(): # Evaluating minimum values
-            if obj in usedobj:
-                continue
-            for abone in assignbones:
-                if bone == abone:
-                    index = assignbones.index(abone)
-                    if usedname[index] == 0:
-                        bpy.data.objects[obj].name = assignnames[index] + "_0"
-                        usedname[index] = 1
-                    else:
-                        bpy.data.objects[obj].name = assignnames[index] + "_other{}_0".format(level)
-
-            usedobj.append(obj) # Adding used objects in current loop to avoid picking the same in level 1
-
-def autoRenamer():
-    try: # We use try function in case we are already in object mode
-        bpy.ops.object.mode_set(mode="OBJECT") # We enter object mode, because we are manipulating objects.
-    except:
-        pass
-    setOrigin()
-    namingConventions()
-
-class OBJECT_OT_AutoRenamer(bpy.types.Operator):
-    """ Auto rename all meshes based on bones and assigning further names """
-    bl_idname = "autorenamer.parent"
-    bl_label = "Auto renamer"
-
-    def execute(self, context):
-        autoRenamer()
-        return {'FINISHED'}
-    def invoke(self, context, event):
-        return context.window_manager.invoke_confirm(self, event, 
-        title='CAUTION', 
-        message='If you have already renamed or have more than LOD 0, this could lead to catastrophic naming results', 
-        confirm_text='Are you sure?', icon='WARNING', text_ctxt='', translate=True)
-
-################################################################################################
-##                                                                                            ##
-##                                  SET BODY PARENTING                                        ##
-##                                                                                            ##
-################################################################################################
-
-class OBJECT_OT_BodyParent(bpy.types.Operator):
-    """ Parent all body parts if naming convention is respected """
-    bl_idname = "body.parent"
-    bl_label = "Parent Meshes"
-
-    def execute(self, context):
-        
-        if "pelvis" not in bpy.data.armatures["skeleton_root"].bones:
-            self.report({'ERROR'}, "No playermodel loaded!")
-        
-            return {'FINISHED'}
-        
-        for object in bpy.data.objects:       
-            
-            if "_cap_" in object.name or object.name.startswith("*") or "scene_root" in object.name:
-                continue
-            
-            matrixcopy = object.matrix_world.copy() 
-            object.parent = bpy.data.objects[OBJECT_OT_BodyParent.parent(object)]
-            object.matrix_world = matrixcopy # We copy and put the matrix world before inheritance
-        
-        return {'FINISHED'}
-       
-    def invoke(self, context, event):
-        return context.window_manager.invoke_confirm(self, event, 
-        title='CAUTION', 
-        message="This one should work as a charm, but anyways, let me ask if you are sure about this", 
-        confirm_text="PARENT, C'MON!", icon='WARNING', text_ctxt='', translate=True)
-   
-    def parent(object):              
-  
-        parts = {
-            "l_leg": "hips",
-            "r_leg": "hips",
-            "torso": "hips",
-            "l_arm": "torso",
-            "r_arm": "torso",
-            "l_hand": "l_arm",
-            "r_hand": "r_arm",
-            "head": "torso",
-            "hips": "stupidtriangle_off",
-            "stupidtriangle_off": "model_root",
-        }
-        
-        
-        if "model_root" in object.name or "skeleton_root" in object.name:
-            return "scene_root"
-        
-        strippedObj = stripLOD(object)    
-        
-        for item in parts.keys():
-            print(item)
-            if strippedObj == item:
-                return f"{parts.get(strippedObj)}_{getLOD(object)}"
-            elif item in strippedObj:
-                return f"{item}_{getLOD(object)}"
-        return f"hips_{getLOD(object)}"
-      
-  
-
-################################################################################################
-##                                                                                            ##
-##                                  SET CAP PARENTING                                         ##
-##                                                                                            ##
-################################################################################################
-    
-class OBJECT_OT_CapParent(bpy.types.Operator):
-    """ Parent all caps """
-    bl_idname = "cap.parent"
-    bl_label = "Parent Caps"
-
-    def execute(self, context):
-        
-        if "pelvis" not in bpy.data.armatures["skeleton_root"].bones:
-            self.report({'ERROR'}, "No playermodel loaded!")
-        
-            return {'FINISHED'}
-        
-        for object in bpy.data.objects:
-            
-            if object.g2_prop_tag or "_cap_" not in object.name or "scene_root" in object.name:
-                continue
-                
-            matrixcopy = object.matrix_world.copy() 
-            object.parent = bpy.data.objects[OBJECT_OT_CapParent.parent(object)]    
-            object.matrix_world = matrixcopy # Same problem was found in caps         
-            
-        return {'FINISHED'}
-    
-    def invoke(self, context, event):
-        return context.window_manager.invoke_confirm(self, event, 
-        title='CAUTION', 
-        message="This one should work as a charm, but anyways, let me ask if you are sure about this", 
-        confirm_text="PARENT, C'MON!", icon='WARNING', text_ctxt='', translate=True)
-    def parent(object):    
-
-        return "_cap_".join(object.name.split("_cap_", 1)[:1]) + "_" + getLOD(object)  
-
-################################################################################################
-##                                                                                            ##
-##                                  SET TAG PARENTING                                         ##
-##                                                                                            ##
-################################################################################################
-
 class OBJECT_OT_TagParent(bpy.types.Operator):
     """ Parent all tags """
     bl_idname = "tag.parent"
@@ -674,30 +273,24 @@ class OBJECT_OT_TagParent(bpy.types.Operator):
 
     def execute(self, context):
         
+        # Check if pelvis is in the skeleton_root, if not then it's not a humanoid skeleton
+        # Throw an error if so
         if "pelvis" not in bpy.data.armatures["skeleton_root"].bones:
             self.report({'ERROR'}, "No playermodel loaded!")
-        
-            return {'FINISHED'}
             
         for object in bpy.data.objects:  
                 
-            if "*" not in object.name:
+            if not object.g2_prop_tag:
                 continue
                 
             matrixcopy = object.matrix_world.copy() 
-            object.parent = bpy.data.objects[OBJECT_OT_TagParent.parent(object)]
-            object.matrix_world = matrixcopy # Same problem was found in tags  
+            object.parent = bpy.data.objects[self.parent(object)]
+            object.matrix_world = matrixcopy 
         
         return {'FINISHED'} 
     
   
-    def invoke(self, context, event):
-        return context.window_manager.invoke_confirm(self, event, 
-        title='CAUTION', 
-        message="This one should work as a charm, but anyways, let me ask if you are sure about this", 
-        confirm_text="PARENT, C'MON!", icon='WARNING', text_ctxt='', translate=True)
-  
-    def parent(object):
+    def parent(self, object):
     
         tags = {
             "*back": "torso",
@@ -749,8 +342,117 @@ class OBJECT_OT_TagParent(bpy.types.Operator):
         }
         
         if stripLOD(object) in tags:
-            return tags.get(stripLOD(object)) + "_" + getLOD(object)
-        return "hips_" + getLOD(object)
+            return f"{tags.get(stripLOD(object))}_{getLOD(object)}"
+        
+        return f"hips_{getLOD(object)}"
+        
+
+################################################################################################
+##                                                                                            ##
+##                                  SET BODY PARENTING                                        ##
+##                                                                                            ##
+################################################################################################
+
+class OBJECT_OT_BodyParent(bpy.types.Operator):
+    """ Parent all body parts if naming convention is respected """
+    bl_idname = "body.parent"
+    bl_label = "Parent Meshes"
+
+    def execute(self, context):
+        
+        # Check if pelvis is in the skeleton_root, if not then it's not a humanoid skeleton
+        # Throw an error if so
+        if "pelvis" not in bpy.data.armatures["skeleton_root"].bones:
+            self.report({'ERROR'}, "No playermodel loaded!")
+        
+            return {'FINISHED'}
+        
+        for object in bpy.data.objects:       
+            
+            # If stupidtriangle (which has no use) is found, delete it.
+            # This is just a way to clean up the model
+            if "stupidtriangle" in object.name:
+                object.select_set(True)
+                bpy.ops.object.delete(use_global=True, confirm=True)
+                continue
+            
+            if "_cap_" in object.name or object.g2_prop_tag or "scene_root" in object.name:
+                continue
+            
+            matrixcopy = object.matrix_world.copy() 
+            
+            object.parent = bpy.data.objects[self.parent(object)]
+            object.matrix_world = matrixcopy
+        
+        return {'FINISHED'}
+   
+    def parent(self, object):              
+  
+        parts = {
+            "l_leg": "hips",
+            "r_leg": "hips",
+            "torso": "hips",
+            "l_arm": "torso",
+            "r_arm": "torso",
+            "l_hand": "l_arm",
+            "r_hand": "r_arm",
+            "head": "torso",
+            "hips": "model_root",
+        }
+        
+        # Parent model_root_LOD and skeleton_root to scene_root
+        if "model_root" in object.name or "skeleton_root" in object.name:
+            return "scene_root"
+        
+        strippedObj = stripLOD(object)    
+        
+        for item in parts.keys():
+            print(item)
+            
+            if strippedObj == item:
+                return f"{parts.get(strippedObj)}_{getLOD(object)}"
+            elif item in strippedObj:
+                return f"{item}_{getLOD(object)}"
+            
+        return f"hips_{getLOD(object)}"
+  
+
+################################################################################################
+##                                                                                            ##
+##                                  SET CAP PARENTING                                         ##
+##                                                                                            ##
+################################################################################################
+    
+class OBJECT_OT_CapParent(bpy.types.Operator):
+    """ Parent all caps """
+    bl_idname = "cap.parent"
+    bl_label = "Parent Caps"
+
+    def execute(self, context):
+        
+        # Check if pelvis is in the skeleton_root, if not then it's not a humanoid skeleton
+        # Throw an error if so
+        if "pelvis" not in bpy.data.armatures["skeleton_root"].bones:
+            self.report({'ERROR'}, "No playermodel loaded!")
+        
+            return {'FINISHED'}
+        
+        for object in bpy.data.objects:
+            
+            if "_cap_" not in object.name or object.g2_prop_tag or object.type == "EMPTY":
+                continue
+                
+            matrixcopy = object.matrix_world.copy() 
+            
+            object.parent = bpy.data.objects[self.parent(object)]    
+            object.matrix_world = matrixcopy # Same problem was found in caps         
+            
+        return {'FINISHED'}
+    
+    def parent(self, object):    
+
+        return "_cap_".join(object.name.split("_cap_", 1)[:1]) + "_" + getLOD(object)  
+
     
 ################################################################################################
 ##                                                                                            ##
@@ -764,7 +466,9 @@ class OBJECT_OT_VehicleParent(bpy.types.Operator):
     bl_label = "Assemble Vehicle"
 
     def execute(self, context):
-        
+             
+        # Check if pelvis is in the skeleton_root, if it's not then we're probably using a vehicle armature
+        # Throw an error if not
         if "pelvis" in bpy.data.armatures["skeleton_root"].bones:
             self.report({'ERROR'}, "No vehiclemodel loaded!")
             
@@ -775,12 +479,12 @@ class OBJECT_OT_VehicleParent(bpy.types.Operator):
                 continue
             
             matrixcopy = object.matrix_world.copy() 
-            object.parent = bpy.data.objects[OBJECT_OT_VehicleParent.parentVehicle(object) + "_" + getLOD(object)]
-            object.matrix_world = matrixcopy # Can't test this, but we suppose it also messes up
+            object.parent = bpy.data.objects[self.parent(object) + "_" + getLOD(object)]
+            object.matrix_world = matrixcopy
             
         return {'FINISHED'} 
     
-    def parentVehicle(object):  
+    def parent(self, object):  
         """ Goes through the dictionary and return the key value if found, else return body. """
         
         if "skeleton" or "model" in object.name:
@@ -816,12 +520,7 @@ class OBJECT_OT_UnparentAll(bpy.types.Operator):
             matrixcopy = object.matrix_world.copy()
             object.parent = None 
             object.matrix_world = matrixcopy # We do the same when un-parenting
-            
-    def invoke(self, context, event):
-        return context.window_manager.invoke_confirm(self, event, 
-        title='CAUTION', 
-        message="This will unparent all objects. Are you REALLY sure?", 
-        confirm_text="YES, GO!", icon='WARNING', text_ctxt='', translate=True)
+
         
         return {'FINISHED'} 
     
@@ -842,12 +541,6 @@ class OBJECT_OT_Clean(bpy.types.Operator):
             if ".00" in object.name:
                 object.select_set(True)
                 bpy.ops.object.delete(use_global=True, confirm=True)
-                
-    def invoke(self, context, event):
-        return context.window_manager.invoke_confirm(self, event, 
-        title='CAUTION', 
-        message="This will lean duplicates, understood as .00 in object name", 
-        confirm_text="REMOVE!", icon='WARNING', text_ctxt='', translate=True)
         
         return {'FINISHED'}
 
@@ -862,21 +555,21 @@ class OBJECT_OT_CreateSkinFile(bpy.types.Operator):
     bl_idname = "file.create_skin"
     bl_label = "Create .SKIN"
     
-    folder_path : bpy.props.StringProperty(
+    folder_path: bpy.props.StringProperty(
         name = "Save to",
         default = "",
-        description = "Select the model in /models/players/name/",
+        description = "Select a path where to save the .skin file",
         maxlen = 1024,
         subtype = "DIR_PATH"
     )
-    shadername : bpy.props.StringProperty(name="Enter model name", default = "")
+    
+    shadername: bpy.props.StringProperty(name="Enter model name", default = "")
     
     def execute(self, context): 
         
         path = bpy.path.abspath(self.folder_path)
         shadername = self.shadername
-        file = open(path + "\model_default.skin", "w")
-        
+        file = open(path + f"\{shadername}.skin", "w")
         exclude = (
             "scene_root", 
             "model_root_0",
@@ -894,13 +587,13 @@ class OBJECT_OT_CreateSkinFile(bpy.types.Operator):
             "skeleton_root"
         )
         
-        caps = ""
-        
+        caps = ""     
         fiveLines = ""
         index = 0
+        
         for object in bpy.data.objects:
             
-            if object.type != "MESH" or object.active_material is None:
+            if object.type == "EMPTY" or object.active_material is None:
                 continue
             
             if object.g2_prop_tag or object.name in exclude or object == None:
@@ -915,7 +608,6 @@ class OBJECT_OT_CreateSkinFile(bpy.types.Operator):
                 caps = caps + object.g2_prop_name + "," + object.active_material.name.split(".tga")[0] + ".tga\n"
                 continue
             
-            
             if "Material" in object.active_material.name:
                 file.write(object.g2_prop_name + ",*off\n")
                 continue
@@ -925,14 +617,15 @@ class OBJECT_OT_CreateSkinFile(bpy.types.Operator):
             else:
                 lastItem = object.active_material.name
             
-            if "." in lastItem:
-                lastItem = lastItem
-            else:
+            if "." not in lastItem:
                 lastItem = lastItem + ".tga"
+                
             stringtowrite = object.g2_prop_name + "," + "models/players/" + shadername + "/" + lastItem + "\n"
+            
             if index < 6:
                 fiveLines = fiveLines + stringtowrite
                 index += 1
+            
             file.write(stringtowrite)  
 
         file.write("\n")
@@ -940,92 +633,12 @@ class OBJECT_OT_CreateSkinFile(bpy.types.Operator):
         file.close()
         fiveLines = fiveLines + f"Written in path {path}"
         showMessage(fiveLines, "model_default.skin created, showing first 5 lines", "INFO")
+        
         return {'FINISHED'}
     
     def invoke(self,context,event):
         return context.window_manager.invoke_props_dialog(self)
-    
-################################################################################################
-##                                                                                            ##
-##                            CREATE NEW MODEL_ROOT HIERARCHIES                               ##
-##                                                                                            ##
-################################################################################################
-    
-class OBJECT_OT_CreateLODs(bpy.types.Operator):
-    """Create 3 extra LOD levels"""
-    bl_idname = "lod.create"
-    bl_label = "Create LODs"
-    
-    def execute(self, context):
-        lodInfo = ""
-        settings = bpy.context.scene.settings
-        for lod in (1,2,3):
-            verts = OBJECT_OT_CreateLODs.autoLOD(lod, settings.angle_limit, settings.delimit_item, settings.boundaries)   
-            lodInfo = lodInfo + f"Created model_root_{getLOD(bpy.context.selected_objects[0])} with {verts} vertices.\n"
-        showMessage(lodInfo, "LOD resume", "INFO")
-    
-        return {'FINISHED'}       
 
-    def invoke(self, context, event):
-        return context.window_manager.invoke_confirm(self, event, 
-        title='CAUTION', 
-        message="LOD create will make the following: take LOD 0 to make LOD 3 by dissolve limit, 1/2 for LOD 2 and 1/5 for LOD 3, continue?", 
-        confirm_text="DO IT!", icon='WARNING', text_ctxt='', translate=True)
-
-    def autoLOD(lod, maxLimit, mode, boundaries):
-            
-        bpy.ops.object.select_all(action='DESELECT') # We deselect everything
-        
-        for object in bpy.context.scene.objects:
-            if "skeleton_root" in object.name or "scene_root" in object.name:
-                continue
-            
-            if object.name.endswith("_0"):
-                object.select_set(True)
-                
-        bpy.ops.object.duplicate() # We make a duplicate
-        
-        for obj in bpy.context.selected_objects:
-            
-            obj.name = obj.name.replace("0.001", str(lod)) # We rename selected objects. Actually we are always working with LOD 0
-            
-            if obj.g2_prop_tag or "stupidtriangle" in obj.name or "skeleton_root" in obj.name or "scene_root" in obj.name or "model_root" in obj.name:
-                obj.select_set(False) # We unselect what we do not want to be dissolved  
-        
-        if bpy.context.selected_objects:
-            bpy.context.view_layer.objects.active = bpy.context.selected_objects[-1]
-        else: 
-            bpy.context.view_layer.objects.active = None
-               
-        bpy.ops.object.mode_set(mode='EDIT')
-        bpy.ops.mesh.select_all(action='SELECT') # Select every vertex in the mesh           
-        bpy.ops.mesh.remove_doubles() # We optimize removing doubles
-      
-        radians = math.radians(maxLimit)
-        angle = 0.0
-        match lod:
-            case 3:
-                angle = radians
-            case 2:
-                angle = radians/2
-            case 1:
-                angle = radians/5
-        
-        bpy.ops.mesh.tris_convert_to_quads()             
-        bpy.ops.mesh.dissolve_limited(angle_limit=angle, use_dissolve_boundaries=boundaries, delimit={mode})
-        bpy.ops.mesh.quads_convert_to_tris() # We apply our dissolve formula
-        
-        bpy.ops.object.mode_set(mode='OBJECT')
-        
-        verts = 0
-        
-        for obj in bpy.context.selected_objects:
-            if obj.type != 'MESH':
-                continue
-            
-            verts += len(obj.data.vertices)
-            
-        return verts
 
 ################################################################################################
 ##                                                                                            ##
@@ -1044,17 +657,12 @@ class OBJECT_OT_SetGhoul2Properties(bpy.types.Operator):
             if object.type != "MESH":
                 continue
                 
-            OBJECT_OT_SetGhoul2Properties.setProperties(object)
+            self.setProperties(object)
     
         return {'FINISHED'}
         
-    def invoke(self, context, event):
-        return context.window_manager.invoke_confirm(self, event, 
-        title='CAUTION', 
-        message="By proceeding, you will get g2_prop_name as their object name, tags set to tag and caps set to off", 
-        confirm_text="DO IT!", icon='WARNING', text_ctxt='', translate=True)
     # Setting automatically object name as g_prop, off for caps and tag for *tags
-    def setProperties(object): 
+    def setProperties(self, object): 
                 
         if "_cap_" in object.name:
             object.g2_prop_off = True
@@ -1070,7 +678,7 @@ class OBJECT_OT_SetGhoul2Properties(bpy.types.Operator):
         # Let people manually set shaders, if needed
 
 
-class OBJECT_OT_SelectOnlyMeshes(bpy.types.Operator):
+class OBJECT_OT_SelectObjectType(bpy.types.Operator):
     bl_idname = "g2.select"
     bl_label = "Model part select"
     
@@ -1078,25 +686,20 @@ class OBJECT_OT_SelectOnlyMeshes(bpy.types.Operator):
         bpy.ops.object.select_all(action='DESELECT')
         settings = bpy.context.scene.settings
             
-        for obj in bpy.data.objects:
-            if "skeleton_root" in obj.name or "model_root" in obj.name or "stupidtriangle" in obj.name or "scene_root" in obj.name:
+        for object in bpy.data.objects:
+            if object.type == "EMPTY" or object.type == "ARMATURE" or "stupidtriangle" in object.name:
                 continue
-            if settings.meshes and "*" not in obj.name and "cap" not in obj.name:
-                obj.select_set(True)
-            if settings.tags and ("*" in obj.name):
-                obj.select_set(True)
-            if settings.caps and ("cap" in obj.name) and ("*" not in obj.name):
-                obj.select_set(True)
-        
-
+            
+            if settings.meshes and not object.g2_prop_tag and "_cap_" not in object.name:
+                object.select_set(True)
+            
+            if settings.tags and object.g2_prop_tag:
+                object.select_set(True)
+            
+            if settings.caps and "cap" in object.name and not object.g2_prop_tag:
+                object.select_set(True)
     
         return {'FINISHED'}
-    
-    def invoke(self, context, event):
-        return context.window_manager.invoke_confirm(self, event, 
-        title='CAUTION', 
-        message="You are going to select some parts, are you sure?", 
-        confirm_text="Sure!", icon='WARNING', text_ctxt='', translate=True)
         
     
 ################################################################################################
@@ -1133,18 +736,13 @@ classes = [
     OBJECT_OT_BodyParent,
     OBJECT_OT_CapParent,
     OBJECT_OT_TagParent,
-    OBJECT_OT_AutoRenamer,
-    OBJECT_OT_AutoSplitter,
     OBJECT_OT_SetGhoul2Properties,
     OBJECT_OT_Clean,
     OBJECT_OT_CreateSkinFile,
     OBJECT_OT_VehicleParent,    
     OBJECT_OT_UnparentAll,
-    OBJECT_OT_CreateLODs,
-    OBJECT_OT_EmptyVertexGroupDelete,
     OBJECT_OT_CreateTags,
-    OBJECT_OT_AutoMaterialCleaner,
-    OBJECT_OT_SelectOnlyMeshes
+    OBJECT_OT_SelectObjectType
 ]
 
 if __name__ == "__main__":
