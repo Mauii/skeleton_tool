@@ -219,7 +219,8 @@ class OBJECT_OT_BodyParent(bpy.types.Operator):
             
             matrixcopy = object.matrix_world.copy() 
             
-            object.parent = self.parent(object)
+            if self.parent(object): object.parent = self.parent(object)
+
             object.matrix_world = matrixcopy
             
             self.triangulate(object)
@@ -260,18 +261,18 @@ class OBJECT_OT_BodyParent(bpy.types.Operator):
         object.g2_prop_tag = False
 
         if length == 2:
-            return bpy.data.objects[f"{hierarchy[splitObject[0]]}_{splitObject[1]}"]
+            return bpy.data.objects.get(f"{hierarchy[splitObject[0]]}_{splitObject[1]}")
 
         elif length == 3 and splitObject[0] in ("l", "r"):
-            return bpy.data.objects[f"{hierarchy[get_hierarchy_name(splitObject[:2])]}_{splitObject[-1]}"]
+            return bpy.data.objects.get(f"{hierarchy[get_hierarchy_name(splitObject[:2])]}_{splitObject[-1]}")
         
         elif length == 3:
-            return bpy.data.objects[f"{get_hierarchy_name(splitObject)}_{splitObject[-1]}"]
+            return bpy.data.objects.get(f"{get_hierarchy_name(splitObject)}_{splitObject[-1]}")
 
         elif length > 3 and splitObject[0] in ("l", "r"):
-            return bpy.data.objects[f"{'_'.join(splitObject[:2])}_{splitObject[-1]}"]
+            return bpy.data.objects.get(f"{'_'.join(splitObject[:2])}_{splitObject[-1]}")
 
-        return bpy.data.objects[f"{splitObject[0]}_{splitObject[-1]}"]
+        return bpy.data.objects.get(f"{splitObject[0]}_{splitObject[-1]}")
     
     def triangulate(self, object):
 
@@ -284,9 +285,9 @@ class OBJECT_OT_BodyParent(bpy.types.Operator):
                 # Check for non-triangulated faces
                 if any(len(face.vertices) > 3 for face in mesh.polygons):
                     object.modifiers.new(name="Triangulate", type='TRIANGULATE')
-                    modifiers['Triangulate'].quad_method = 'BEAUTY'
-                    modifiers['Triangulate'].ngon_method = 'BEAUTY'
-                    modifiers['Triangulate'].min_vertices = 4  # Minimum vertices for ngons
+                    object.modifiers['Triangulate'].quad_method = 'BEAUTY'
+                    object.modifiers['Triangulate'].ngon_method = 'BEAUTY'
+                    object.modifiers['Triangulate'].min_vertices = 4  # Minimum vertices for ngons
 
                     # Apply the modifier
                     bpy.context.view_layer.objects.active = object
@@ -450,7 +451,6 @@ class OBJECT_OT_CreateSkinFile(bpy.types.Operator):
     
 
     def execute(self, context): 
-        os.system('cls')
         
         props = context.scene.settings
         path = bpy.path.abspath(props.folder_path)
@@ -472,14 +472,19 @@ class OBJECT_OT_CreateSkinFile(bpy.types.Operator):
                         caps += f"{object.g2_prop_name},models/players/stormtrooper/caps.tga\n"
                         continue
                     
-                    if object.active_material:
-                        # Remove the suffix like .001, .002, etc., from the material name if it exists
-                        material_name = object.active_material.node_tree.nodes['Image Texture'].image.name
+                    clean_material_name = ""
+                    
+                    if object.active_material.node_tree.nodes.get('Image Texture'):
+                        material_name = object.active_material.node_tree.nodes['Image Texture'].image.name 
                         clean_material_name = re.sub(r'\.\d+$', '', material_name)
+                    else:
+                        material_name = object.active_material.name
 
                     # Ensure the material name has the correct extension
                     if clean_material_name.endswith('.jpg') or clean_material_name.endswith('.png'):
                         clean_material_name = clean_material_name[:-4]  # Remove .jpg extension
+                    else:
+                        clean_material_name = material_name
                     
                     modelparts += f"{object.g2_prop_name},models/players/{modelname}/{clean_material_name}.tga\n"
                 
@@ -539,7 +544,8 @@ class OBJECT_OT_SetArmature(bpy.types.Operator):
 
                 object.modifiers["Armature"].object = bpy.data.objects["skeleton_root"] 
     
-        return {'FINISHED'}  
+        return {'FINISHED'}
+          
     
 class OBJECT_OT_RemoveEmptyVertexGroups(bpy.types.Operator):
     bl_idname = "remove.emptyvgroups"
