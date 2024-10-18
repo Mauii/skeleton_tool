@@ -25,26 +25,23 @@ class OBJECT_PT_SkeletonTool(bpy.types.Panel):
         box = layout.box() 
         box.label(text="Playermodel")
         
-        box.operator("body.parent") 
-        box.operator("cap.parent") 
-        box.operator("tag.parent")
-        
-        box = layout.box()
-        box.label(text="Create Necessary")
-        box.operator("tag.create")
         box.operator("create.root")
-        box.operator("file.create_skin")
-        
-        box = layout.box() 
-        box.label(text="Vehicles")
-        box.operator("vehicle.parent")
+        box.operator("set.armaturemod")
+        box.operator("parent.objects") 
+        box.operator("create.tags")
+        box.operator("parent.tags")
+        box.operator("set.g2properties")
+        box.operator("create.skinfile")
         
         box = layout.box()
         box.label(text="Misc") 
         box.operator("remove.parent")
-        box.operator("hierarchy.clean")
-        box.operator("set.armaturemod")
+        box.operator("clean.hierarchy")
         box.operator("remove.emptyvgroups")
+        
+        box = layout.box() 
+        box.label(text="Vehicles")
+        box.operator("parent.vehicle")
         
         box = layout.box()
         box.label(text="Select") 
