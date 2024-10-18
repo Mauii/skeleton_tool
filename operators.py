@@ -380,56 +380,6 @@ class OBJECT_OT_SetG2Properties(bpy.types.Operator):
                                      
         return {'FINISHED'}
 
-    
-################################################################################################
-##                                                                                            ##
-##                              SET VEHICLE PARENTING                                         ##
-##                                                                                            ##
-################################################################################################
-    
-class OBJECT_OT_VehicleParent(bpy.types.Operator):
-    """ Parent objects, caps and tags from the vehicle """
-    bl_idname = "parent.vehicle"
-    bl_label = "Assemble Vehicle"
-
-    def execute(self, context):
-        os.system('cls')  
-        # Check if pelvis is in the skeleton_root, if it's not then we're probably using a vehicle armature
-        # Throw an error if not
-        if "pelvis" in bpy.data.armatures["skeleton_root"].bones:
-            self.report({'ERROR'}, "No vehiclemodel loaded!")
-            
-            return {'FINISHED'}
-        
-        for object in bpy.data.objects:     
-            if "scene" in object.name:
-                continue
-            
-            matrixcopy = object.matrix_world.copy() 
-            object.parent = bpy.data.objects[self.parent(object) + "_" + getLOD(object)]
-            object.matrix_world = matrixcopy
-            
-        return {'FINISHED'} 
-    
-    def parent(self, object):  
-        """ Goes through the dictionary and return the key value if found, else return body. """
-        
-        if "skeleton" or "model" in object.name:
-            return "scene_root"
-           
-        dictionary = {
-            "body": "model_root",
-            "l_wing1": "body",
-            "l_wing2": "l_wing1",
-            "r_wing1": "body",
-            "r_wing2": "r_wing1"
-            }
-        
-        if stripLOD(object) in dictionary:
-            return dictionary.get(object)
-
-        return "body"  
-
 ################################################################################################
 ##                                                                                            ##
 ##                               REMOVE ALL PARENTING                                         ##

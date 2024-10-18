@@ -39,10 +39,6 @@ class OBJECT_PT_SkeletonTool(bpy.types.Panel):
         box.operator("clean.hierarchy")
         box.operator("remove.emptyvgroups")
         
-        box = layout.box() 
-        box.label(text="Vehicles")
-        box.operator("parent.vehicle")
-        
         box = layout.box()
         box.label(text="Select") 
         box.operator("select.object_type")
