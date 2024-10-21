@@ -60,7 +60,7 @@ class OBJECT_OT_CreateTags(bpy.types.Operator):
                 self.create_mesh_from_data(mesh_data)  # Call with self
             self.report({'INFO'}, "Tags created with vertex groups and weights.")
         else:
-            self.report({'ERROR'}, "Mesh data file not found.")
+            self.report({'ERROR'}, "Tags data file not found.")
 
         return {'FINISHED'}
 
@@ -68,6 +68,7 @@ class OBJECT_OT_CreateTags(bpy.types.Operator):
         """Loads mesh data from a JSON file"""
         with open(file_path, 'r') as f:
             mesh_data_list = json.load(f)
+            
         return mesh_data_list
 
     def create_mesh_from_data(self, mesh_data):
@@ -141,13 +142,7 @@ class OBJECT_OT_TagParent(bpy.types.Operator):
     bl_idname = "parent.tags"
     bl_label = "Parent Tags"
 
-    def execute(self, context):
-        
-        # Check if pelvis is in the skeleton_root, if not then it's not a humanoid skeleton
-        # Throw an error if so
-        if "pelvis" not in bpy.data.armatures["skeleton_root"].bones:
-            self.report({'ERROR'}, "No playermodel loaded!")
-            
+    def execute(self, context):     
         for object in bpy.data.objects:
             if object.g2_prop_tag:
                 
@@ -190,12 +185,6 @@ class OBJECT_OT_BodyParent(bpy.types.Operator):
 
     def execute(self, context):
         os.system('cls')
-        # Check if pelvis is in the skeleton_root, if not then it's not a humanoid skeleton
-        # Throw an error if so
-        if "pelvis" not in bpy.data.armatures["skeleton_root"].bones:
-            self.report({'ERROR'}, "No playermodel loaded!")
-        
-            return {'FINISHED'}
             
         for object in bpy.data.objects:
             self.triangulate(object)
@@ -323,7 +312,6 @@ class OBJECT_OT_BodyParent(bpy.types.Operator):
         return {'FINISHED'}
     
     def triangulate(self, object):
-
         # Iterate through all objects in the scene
         for object in bpy.data.objects:
             # Check if the object is a mesh
@@ -354,12 +342,6 @@ class OBJECT_OT_SetG2Properties(bpy.types.Operator):
 
     def execute(self, context):
         os.system('cls')
-        # Check if pelvis is in the skeleton_root, if not then it's not a humanoid skeleton
-        # Throw an error if so
-        if "pelvis" not in bpy.data.armatures["skeleton_root"].bones:
-            self.report({'ERROR'}, "No playermodel loaded!")
-        
-            return {'FINISHED'}
         
         for object in bpy.data.objects:
             
@@ -393,6 +375,7 @@ class OBJECT_OT_UnparentAll(bpy.types.Operator):
 
     def execute(self, context):
         os.system('cls')
+        
         for object in bpy.data.objects:
             matrixcopy = object.matrix_world.copy()
             object.parent = None 
@@ -412,8 +395,9 @@ class OBJECT_OT_Clean(bpy.types.Operator):
     bl_idname = "clean.hierarchy"
     bl_label = "Clean duplicates"
 
-    def execute(self, context):
+    def execute(self, context): 
         os.system('cls')
+        
         for object in bpy.data.objects:         
             if ".00" in object.name:
                 object.select_set(True)
@@ -441,8 +425,7 @@ class OBJECT_OT_CreateSkinFile(bpy.types.Operator):
         layout.prop(props, "modelname")
     
 
-    def execute(self, context): 
-        
+    def execute(self, context):       
         props = context.scene.settings
         path = bpy.path.abspath(props.folder_path)
         shadername = props.shadername
@@ -521,11 +504,13 @@ class OBJECT_OT_SelectObjectType(bpy.types.Operator):
     
     def execute(self, context): 
         os.system('cls')
+        
         bpy.ops.object.select_all(action='DESELECT')
+        
         settings = bpy.context.scene.settings
             
         for object in bpy.data.objects:
-            if object.type == "EMPTY" or object.type == "ARMATURE" or "stupidtriangle" in object.name:
+            if object.type == "EMPTY" or object.type == "ARMATURE":
                 continue
             
             if settings.meshes and (not object.g2_prop_tag and "_cap_" not in object.name):
@@ -565,8 +550,9 @@ class OBJECT_OT_RemoveEmptyVertexGroups(bpy.types.Operator):
     bl_idname = "remove.emptyvgroups"
     bl_label = "Remove Empty VGroups"
     
-    def execute(self, context): 
+    def execute(self, context):      
         os.system('cls')
+        
         for object in bpy.data.objects:
             
             if object.g2_prop_off and "_cap_" in object.name or object.g2_prop_tag:
@@ -655,7 +641,6 @@ def register_operators():
     bpy.utils.register_class(OBJECT_OT_TagParent)
     bpy.utils.register_class(OBJECT_OT_SetG2Properties)
     bpy.utils.register_class(OBJECT_OT_CreateSkinFile)
-    bpy.utils.register_class(OBJECT_OT_VehicleParent)
     bpy.utils.register_class(OBJECT_OT_UnparentAll)
     bpy.utils.register_class(OBJECT_OT_CreateTags)
     bpy.utils.register_class(OBJECT_OT_Clean)
@@ -669,7 +654,6 @@ def unregister_operators():
     bpy.utils.unregister_class(OBJECT_OT_TagParent)
     bpy.utils.unregister_class(OBJECT_OT_SetG2Properties)
     bpy.utils.unregister_class(OBJECT_OT_CreateSkinFile)
-    bpy.utils.unregister_class(OBJECT_OT_VehicleParent)
     bpy.utils.unregister_class(OBJECT_OT_UnparentAll)
     bpy.utils.unregister_class(OBJECT_OT_CreateTags)
     bpy.utils.unregister_class(OBJECT_OT_Clean)
