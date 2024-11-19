@@ -10,10 +10,10 @@ hierarchy = {
     "head": ("cranium", "cervical"),
     "torso": ("thoracic", "upper_lumbar", "lower_lumbar"),
     "hips": ("pelvis", "lfemurYZ", "rfemurYZ"),
-    "l_hand": ("lhand",),
-    "r_hand": ("rhand",),
-    "l_arm": ("lhumerus", "lradius", "lradiusX"),
-    "r_arm": ("rhumerus", "rradius", "rradiusX"),
+    "l_hand": ("l_d1_j1", "l_d1_j2"),
+    "r_hand": ("r_d1_j1", "r_d1_j2"),
+    "l_arm": ("lradius", "lradiusX"),
+    "r_arm": ("rradius", "rradiusX"),
     "l_leg": ("ltalus", "ltibia"),
     "r_leg": ("rtalus", "rtibia")
 }
@@ -38,7 +38,7 @@ newhierarchy = {}
 
 ################################################################################################
 ##                                                                                            ##
-##                                        TAGS FUNCTIONS                                      ##
+##                                        CREATE TAGS                                         ##
 ##                                                                                            ##
 ################################################################################################
 
@@ -136,41 +136,50 @@ class OBJECT_OT_CreateTags(bpy.types.Operator):
         
         return object
 
+################################################################################################
+##                                                                                            ##
+##                                        PARENT TAGS                                         ##
+##                                                                                            ##
+################################################################################################
 
 class OBJECT_OT_TagParent(bpy.types.Operator):
-    """ Parent all tags """
+    """Parent all tags"""
     bl_idname = "parent.tags"
     bl_label = "Parent Tags"
 
-    def execute(self, context):     
+    def execute(self, context):
         for object in bpy.data.objects:
-            if object.g2_prop_tag:
+            if object.g2_prop_tag:  # Check if the object is a tag
                 
-                pattern = r'^\*([lr]+_[a-z]+)'
-                pattern_normal = r'^\*([a-z]+)'
+                # Ignore the first character and split the name
+                name_parts = object.name[1:].split('_')
                 
-                if re.search(pattern, object.name):
-                    tag_name = re.search(pattern, object.name).group()
+                # Determine the parent based on the naming conventions
+                if name_parts[0] in {"l", "r"}:  # Left or right tags
+                    parent = f"{name_parts[0]}_{name_parts[1]}_{name_parts[-1]}"
+                elif f"{name_parts[0]}_{name_parts[-1]}" in bpy.data.objects:
+                    parent = f"{name_parts[0]}_{name_parts[-1]}"
+                elif name_parts[0] == "hip":
+                    parent = f"hips_{name_parts[-1]}"
                 else:
-                    tag_name = re.search(pattern_normal, object.name).group()     
+                    parent = f"torso_{name_parts[-1]}"
                 
-                closest_key = get_closest_key(tag_name, newhierarchy)
-                
-                if closest_key:    
-                    parent_object = newhierarchy[closest_key]['object']
-                else:
-                    parent_object = newhierarchy['torso']['object']
+                # Check if the parent exists
+                parent_object = bpy.data.objects.get(parent)
+                if parent_object:
+                    # Copy the world matrix of the child object
+                    matrixcopy = object.matrix_world.copy()
                     
-                # Copy the world matrix of the child object
-                matrixcopy = object.matrix_world.copy()
-                
-                # Set the parent
-                object.parent = parent_object
-                
-                # Restore the world matrix of the child object
-                object.matrix_world = matrixcopy
+                    # Set the parent
+                    object.parent = parent_object
+                    
+                    # Restore the world matrix of the child object
+                    object.matrix_world = matrixcopy
+                else:
+                    print(f"Warning: Parent '{parent}' for tag '{object.name}' not found.")
         
-        return {'FINISHED'} 
+        return {'FINISHED'}
+
 
 ################################################################################################
 ##                                                                                            ##
@@ -184,74 +193,75 @@ class OBJECT_OT_BodyParent(bpy.types.Operator):
     bl_label = "Parent Objects"
 
     def execute(self, context):
-        os.system('cls')
-            
+        os.system('cls')  # Clears the console (Windows only)
+
         for object in bpy.data.objects:
-            self.triangulate(object)
-            # Ensure the object has vertex groups and is a mesh
+            self.triangulate(object)  # Triangulate the object
+
+            # Skip objects with specific properties
             if object.g2_prop_off or object.g2_prop_tag:
                 continue
-            
+
+            # Handle root objects by name
             if "model_root" in object.name:
                 newhierarchy["model_root"] = {"object": object}
                 continue
-                
+
             if "scene_root" in object.name:
                 newhierarchy["scene_root"] = {"object": object}
                 continue
-            
+
             if "skeleton_root" in object.name:
                 newhierarchy["skeleton_root"] = {"object": object}
                 continue
-            
+
+            # Skip non-mesh objects
+            if object.type != 'MESH':
+                print(f"Skipping non-mesh object: {object.name}")
+                continue
+
+            # Process objects with vertex groups
             if object.vertex_groups:
                 # Get all vertex group names for this object
                 vertex_group_names = {group.name for group in object.vertex_groups}
-                
-                # Check for hand groups
-                if "l_hand" not in newhierarchy and all(group in vertex_group_names for group in hierarchy["l_hand"]):
-                    newhierarchy["l_hand"] = {"object": object}
+
+                # Check for hierarchy matches
+                def check_and_add_to_hierarchy(key):
+                    if key not in newhierarchy:
+                        expected_groups = hierarchy.get(key, [])
+                        if all(group in vertex_group_names for group in expected_groups):
+                            newhierarchy[key] = {"object": object}
+                            return True
+                    return False
+
+                # Check hierarchy keys in order
+                if check_and_add_to_hierarchy("l_hand"):
                     continue
-            
-                if "r_hand" not in newhierarchy and all(group in vertex_group_names for group in hierarchy["r_hand"]):
-                    newhierarchy["r_hand"] = {"object": object}
+                if check_and_add_to_hierarchy("r_hand"):
                     continue
-                
-                # Check for legs
-                if "l_leg" not in newhierarchy and all(group in vertex_group_names for group in hierarchy["l_leg"]):
-                    newhierarchy["l_leg"] = {"object": object}
+                if check_and_add_to_hierarchy("l_leg"):
                     continue
-                        
-                if "r_leg" not in newhierarchy and all(group in vertex_group_names for group in hierarchy["r_leg"]):
-                    newhierarchy["r_leg"] = {"object": object}
+                if check_and_add_to_hierarchy("r_leg"):
                     continue
-                
-                # Check for head
-                if "head" not in newhierarchy and all(group in vertex_group_names for group in hierarchy["head"]):
-                    newhierarchy["head"] = {"object": object}
+                if check_and_add_to_hierarchy("head"):
+                    continue
+                if check_and_add_to_hierarchy("torso"):
+                    continue
+                if check_and_add_to_hierarchy("hips"):
+                    continue
+                if check_and_add_to_hierarchy("l_arm"):
+                    continue
+                if check_and_add_to_hierarchy("r_arm"):
                     continue
 
-                # Check for torso
-                if "torso" not in newhierarchy and all(group in vertex_group_names for group in hierarchy["torso"]):
-                    newhierarchy["torso"] = {"object": object}
-                    continue
-                        
-                # Check for hips
-                if "hips" not in newhierarchy and all(group in vertex_group_names for group in hierarchy["hips"]):
-                    newhierarchy["hips"] = {"object": object}
-                    continue  
-                        
-                # Check for arms
-                if "l_arm" not in newhierarchy and all(group in vertex_group_names for group in hierarchy["l_arm"]):
-                    newhierarchy["l_arm"] = {"object": object}
-                    continue
-                        
-                if "r_arm" not in newhierarchy and all(group in vertex_group_names for group in hierarchy["r_arm"]):
-                    newhierarchy["r_arm"] = {"object": object}
-                    continue                  
+                # If no match was found, print the object's name
+                print(f"Object: {object.name}")
+                print(f"Object's vertex groups: {vertex_group_names}")
             else:
+                # If the object has no vertex groups, print its name
                 print(f"{object.name} has no vertex groups!")
                 continue
+
             
         # Parent the basic hierarchy objects
         for part, info in newhierarchy.items():
@@ -283,31 +293,37 @@ class OBJECT_OT_BodyParent(bpy.types.Operator):
                 bpy.ops.object.delete(use_global=True, confirm=True)
                 continue
             
-            if object.g2_prop_tag:
+            if object.g2_prop_tag or object.g2_prop_off:
                 continue    
             
             if re.search(r'\d$', object.name):
+            
                 if object.name[:-2] not in newhierarchy:
-                    
+                    # Look for objects like l_arm, l_leg, r_arm, r_leg, ...
                     pattern = r'^([lr]+_[a-z]+)'
-                    
                     match = re.search(pattern, object.name)
-                    
+
                     if match:
                         child_object = match.group(1)
                     else:
                         child_object = object.name.split("_")[0]
-                    
+
+                    # Check if the child object is in the hierarchy
+                    if child_object not in newhierarchy:
+                        print(f"Warning: {child_object} not found in newhierarchy.")
+                        continue  # Skip this object
+
                     parent_object = newhierarchy[child_object]['object']
-                    
+
                     # Copy the world matrix of the child object
                     matrixcopy = object.matrix_world.copy()
-                    
+
                     # Set the parent
                     object.parent = parent_object
-                    
+
                     # Restore the world matrix of the child object
                     object.matrix_world = matrixcopy
+
                     
         return {'FINISHED'}
     
@@ -328,6 +344,53 @@ class OBJECT_OT_BodyParent(bpy.types.Operator):
                     # Apply the modifier
                     bpy.context.view_layer.objects.active = object
                     bpy.ops.object.modifier_apply(modifier="Triangulate")
+                    
+################################################################################################
+##                                                                                            ##
+##                                  SET CAP PARENTING                                        ##
+##                                                                                            ##
+################################################################################################
+
+class OBJECT_OT_CapParent(bpy.types.Operator):
+    """ Parent all caps if naming convention is respected """
+    bl_idname = "parent.caps"
+    bl_label = "Parent Caps"
+
+    def execute(self, context):
+        os.system('cls')  # Clears the console (Windows only)
+
+        for object in bpy.data.objects:
+            # Process only objects with g2_prop_off
+            if object.g2_prop_off:
+                # Split the object name into parts
+                name_parts = object.name.split("_")
+                
+                if name_parts[0] in {"l", "r"}:
+                    # Handle cases like l_arm_cap_0
+                    parent_name = f"{name_parts[0]}_{name_parts[1]}_{name_parts[-1]}"
+                else:
+                    # Handle cases like torso_cap_0
+                    parent_name = f"{name_parts[0]}_{name_parts[-1]}"
+
+                # Look for the parent object
+                parent_object = bpy.data.objects.get(parent_name)
+                
+                if parent_object:
+                    # Copy the world matrix of the child object
+                    matrixcopy = object.matrix_world.copy()
+
+                    # Set the parent
+                    object.parent = parent_object
+
+                    # Restore the world matrix of the child object
+                    object.matrix_world = matrixcopy
+                else:
+                    # Print a warning if the parent object is not found
+                    print(f"Warning: Parent '{parent_name}' not found for '{object.name}'")
+            else:
+                continue
+                        
+        return {'FINISHED'}
 
 ################################################################################################
 ##                                                                                            ##
@@ -418,11 +481,30 @@ class OBJECT_OT_CreateSkinFile(bpy.types.Operator):
     
     def draw(self, context):
         props = context.scene.settings
-        
+
         layout = self.layout
-        layout.prop(props, "folder_path")
-        layout.prop(props, "shadername")
-        layout.prop(props, "modelname")
+        
+        # Create a split layout with custom proportions
+        split = layout.split(factor=0.3)  # 30% for the label, 70% for the field
+        
+        # Add properties to the split layout
+        col = split.column()  # Label column
+        col.label(text="Folder Path:")
+        col = split.column()  # Property field column
+        col.prop(props, "folder_path", text="")
+
+        split = layout.split(factor=0.3)
+        col = split.column()
+        col.label(text="Shader Name:")
+        col = split.column()
+        col.prop(props, "shadername", text="")
+
+        split = layout.split(factor=0.3)
+        col = split.column()
+        col.label(text="Model Name:")
+        col = split.column()
+        col.prop(props, "modelname", text="")
+
     
 
     def execute(self, context):       
@@ -638,6 +720,7 @@ def get_closest_key(object_name, dictionary):
 
 def register_operators():
     bpy.utils.register_class(OBJECT_OT_BodyParent)
+    bpy.utils.register_class(OBJECT_OT_CapParent)
     bpy.utils.register_class(OBJECT_OT_TagParent)
     bpy.utils.register_class(OBJECT_OT_SetG2Properties)
     bpy.utils.register_class(OBJECT_OT_CreateSkinFile)
@@ -651,6 +734,7 @@ def register_operators():
     
 def unregister_operators():
     bpy.utils.unregister_class(OBJECT_OT_BodyParent)
+    bpy.utils.unregister_class(OBJECT_OT_CapParent)
     bpy.utils.unregister_class(OBJECT_OT_TagParent)
     bpy.utils.unregister_class(OBJECT_OT_SetG2Properties)
     bpy.utils.unregister_class(OBJECT_OT_CreateSkinFile)

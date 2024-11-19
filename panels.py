@@ -28,6 +28,7 @@ class OBJECT_PT_SkeletonTool(bpy.types.Panel):
         box.operator("create.root")
         box.operator("set.armaturemod")
         box.operator("parent.objects") 
+        box.operator("parent.caps")
         box.operator("create.tags")
         box.operator("parent.tags")
         box.operator("set.g2properties")
