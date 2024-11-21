@@ -677,11 +677,11 @@ class OBJECT_OT_CreateRoot(bpy.types.Operator):
     bl_idname = "create.root"
     bl_label = "Create Model/Scene"
     
-    def execute(self, context): 
+    def execute(self, context):
         os.system('cls')
-        
+
         scene_collection = bpy.context.scene.collection
-        
+
         # Check if scene_root exists
         if "scene_root" not in bpy.data.objects:
             # Add the empty object
@@ -690,7 +690,14 @@ class OBJECT_OT_CreateRoot(bpy.types.Operator):
             new_object = bpy.context.active_object
             new_object.name = "scene_root"
             # Link to the Scene Collection
-            scene_collection.objects.link(new_object)
+            if new_object.name not in scene_collection.objects:
+                scene_collection.objects.link(new_object)
+            new_object.select_set(False)
+        else:
+            # Ensure the object is part of the scene collection
+            existing_object = bpy.data.objects["scene_root"]
+            if existing_object.name not in scene_collection.objects:
+                scene_collection.objects.link(existing_object)
 
         # Check if model_root_0 exists
         if "model_root_0" not in bpy.data.objects:
@@ -700,11 +707,16 @@ class OBJECT_OT_CreateRoot(bpy.types.Operator):
             new_object = bpy.context.active_object
             new_object.name = "model_root_0"
             # Link to the Scene Collection
-            scene_collection.objects.link(new_object)
-            
-        bpy.ops.object.select_all(action='DESELECT')
-            
-        return {'FINISHED'}  
+            if new_object.name not in scene_collection.objects:
+                scene_collection.objects.link(new_object)
+            new_object.select_set(False)
+        else:
+            # Ensure the object is part of the scene collection
+            existing_object = bpy.data.objects["model_root_0"]
+            if existing_object.name not in scene_collection.objects:
+                scene_collection.objects.link(existing_object)
+
+        return {'FINISHED'}
 
 def getLOD(object):   
     return str(object.name[-1])
