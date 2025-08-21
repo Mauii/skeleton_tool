@@ -20,25 +20,35 @@ class OBJECT_PT_SkeletonTool(bpy.types.Panel):
         layout.ui_units_y = 14.0
         
         settings = context.scene.settings
-        obj = context.object
                
         box = layout.box() 
-        box.label(text="Playermodel")
+        box.label(text="Parenting")
         
-        box.operator("create.root")
-        box.operator("set.armaturemod")
-        box.operator("parent.objects") 
-        box.operator("parent.caps")
-        box.operator("create.tags")
+        box.operator("parent.objects")
         box.operator("parent.tags")
-        box.operator("set.g2properties")
+        box.operator("parent.caps")
+        
+        box = layout.box() 
+        box.label(text="Create")
+        
+        box.operator("create.tags")
+        box.operator("create.root")
         box.operator("create.skinfile")
         
+        box = layout.box() 
+        box.label(text="Set")
+        
+        box.operator("set.armaturemod")
+        box.operator("set.g2properties")
+        
+        box = layout.box()
+        box.label(text="Vertex Groups")
+        box.operator("remove.emptyvgroups")
+         
         box = layout.box()
         box.label(text="Misc") 
         box.operator("remove.parent")
         box.operator("clean.hierarchy")
-        box.operator("remove.emptyvgroups")
         
         box = layout.box()
         box.label(text="Select") 

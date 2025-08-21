@@ -18,20 +18,7 @@ hierarchy = {
     "r_leg": ("rtalus", "rtibia")
 }
 
-# Parent mapping
-parents = {
-    "head": "torso",
-    "torso": "hips",
-    "hips": "model_root",
-    "model_root": "scene_root",
-    "skeleton_root": "scene_root",
-    "l_arm": "torso",
-    "r_arm": "torso",
-    "l_hand": "l_arm",
-    "r_hand": "r_arm",
-    "l_leg": "hips",
-    "r_leg": "hips"
-}
+
 
 # New hierarchy to store objects
 newhierarchy = {}
@@ -187,6 +174,19 @@ class OBJECT_OT_TagParent(bpy.types.Operator):
 ##                                                                                            ##
 ################################################################################################
 
+# Parent mapping
+parents = {
+    "head": "torso",
+    "torso": "hips",
+    "hips": "model_root",
+    "l_arm": "torso",
+    "r_arm": "torso",
+    "l_hand": "l_arm",
+    "r_hand": "r_arm",
+    "l_leg": "hips",
+    "r_leg": "hips"
+}
+
 class OBJECT_OT_BodyParent(bpy.types.Operator):
     """ Parent all body parts if naming convention is respected """
     bl_idname = "parent.objects"
@@ -196,136 +196,54 @@ class OBJECT_OT_BodyParent(bpy.types.Operator):
         os.system('cls')  # Clears the console (Windows only)
 
         for object in bpy.data.objects:
-            self.triangulate(object)  # Triangulate the object
 
             # Skip objects with specific properties
-            if object.g2_prop_off or object.g2_prop_tag:
+            if object.g2_prop_off or object.g2_prop_tag or object.name == "scene_root":
                 continue
-
-            # Handle root objects by name
-            if "model_root" in object.name:
-                newhierarchy["model_root"] = {"object": object}
-                continue
-
-            if "scene_root" in object.name:
-                newhierarchy["scene_root"] = {"object": object}
-                continue
-
-            if "skeleton_root" in object.name:
-                newhierarchy["skeleton_root"] = {"object": object}
-                continue
-
-            # Skip non-mesh objects
-            if object.type != 'MESH':
-                print(f"Skipping non-mesh object: {object.name}")
-                continue
-
-            # Process objects with vertex groups
-            if object.vertex_groups:
-                # Get all vertex group names for this object
-                vertex_group_names = {group.name for group in object.vertex_groups}
-
-                # Check for hierarchy matches
-                def check_and_add_to_hierarchy(key):
-                    if key not in newhierarchy:
-                        expected_groups = hierarchy.get(key, [])
-                        if all(group in vertex_group_names for group in expected_groups):
-                            newhierarchy[key] = {"object": object}
-                            return True
-                    return False
-
-                # Check hierarchy keys in order
-                if check_and_add_to_hierarchy("l_hand"):
-                    continue
-                if check_and_add_to_hierarchy("r_hand"):
-                    continue
-                if check_and_add_to_hierarchy("l_leg"):
-                    continue
-                if check_and_add_to_hierarchy("r_leg"):
-                    continue
-                if check_and_add_to_hierarchy("head"):
-                    continue
-                if check_and_add_to_hierarchy("torso"):
-                    continue
-                if check_and_add_to_hierarchy("hips"):
-                    continue
-                if check_and_add_to_hierarchy("l_arm"):
-                    continue
-                if check_and_add_to_hierarchy("r_arm"):
-                    continue
-
-                # If no match was found, print the object's name
-                print(f"Object: {object.name}")
-                print(f"Object's vertex groups: {vertex_group_names}")
-            else:
-                # If the object has no vertex groups, print its name
-                print(f"{object.name} has no vertex groups!")
-                continue
-
             
-        # Parent the basic hierarchy objects
-        for part, info in newhierarchy.items():
-            
-            if part in parents:  # Check if this part has a defined parent
-                parent_part = parents[part]
-                parent_info = newhierarchy.get(parent_part, None)
-                
-                if parent_info:
-                    info["parent"] = parent_info["object"]  # Set the parent object
-                    child_object = info["object"]
-                    parent_object = parent_info["object"]
-                    
-                    # Copy the world matrix of the child object
-                    matrixcopy = child_object.matrix_world.copy()
-                    
-                    # Set the parent
-                    child_object.parent = parent_object
-                    
-                    # Restore the world matrix of the child object
-                    child_object.matrix_world = matrixcopy
-
-        # After parenting the base hierarchy (head, torso, hips, ...) parent the remaining parts
-        for object in bpy.data.objects:
-            
-            # Get rid of stupidtriangle once and for all
+            # Get rid of the useless stupidtriangle once and for all
             if "stupidtriangle" in object.name:
                 object.select_set(True)
                 bpy.ops.object.delete(use_global=True, confirm=True)
                 continue
+
+            if object.type == 'MESH':
+                self.triangulate(object)  # Triangulate the object
+
+            if "skeleton_root" in object.name or "model_root" in object.name:
+                parent_object = bpy.data.objects["scene_root"]
             
-            if object.g2_prop_tag or object.g2_prop_off:
-                continue    
-            
-            if re.search(r'\d$', object.name):
-            
-                if object.name[:-2] not in newhierarchy:
-                    # Look for objects like l_arm, l_leg, r_arm, r_leg, ...
-                    pattern = r'^([lr]+_[a-z]+)'
-                    match = re.search(pattern, object.name)
-
-                    if match:
-                        child_object = match.group(1)
-                    else:
-                        child_object = object.name.split("_")[0]
-
-                    # Check if the child object is in the hierarchy
-                    if child_object not in newhierarchy:
-                        print(f"Warning: {child_object} not found in newhierarchy.")
-                        continue  # Skip this object
-
-                    parent_object = newhierarchy[child_object]['object']
-
-                    # Copy the world matrix of the child object
-                    matrixcopy = object.matrix_world.copy()
-
-                    # Set the parent
-                    object.parent = parent_object
-
-                    # Restore the world matrix of the child object
-                    object.matrix_world = matrixcopy
-
+            elif object.name.split("_")[1].isnumeric():
+                parent_object = bpy.data.objects[f"{parents[object.name[:-2]]}_{getLOD(object)}"]
+                
+            else:
+                if object.name.startswith("l_") or object.name.startswith("r_"):
                     
+                    # If it is an extra piece
+                    if len(object.name.split("_")) > 3:
+                        object_names = object.name.split("_")
+                        parent_object = bpy.data.objects[f"{object_names[0]}_{object_names[1]}_{getLOD(object)}"]
+                    
+                    # If it is not an extra piece
+                    else:
+                        parent_object = bpy.data.objects[f"{parents[object.name[:-2]]}_{getLOD(object)}"]
+                        
+                else:
+                    parent_object = bpy.data.objects[f"{object.name.split('_')[0]}_{getLOD(object)}"]
+            
+            self.parent(object, parent_object)      
+                         
         return {'FINISHED'}
+        
+    def parent(self, child_object, parent_object):
+        # Copy the world matrix of the child object
+        matrixcopy = child_object.matrix_world.copy()
+
+        # Set the parent
+        child_object.parent = parent_object
+
+        # Restore the world matrix of the child object
+        child_object.matrix_world = matrixcopy
     
     def triangulate(self, object):
         # Iterate through all objects in the scene
@@ -347,7 +265,7 @@ class OBJECT_OT_BodyParent(bpy.types.Operator):
                     
 ################################################################################################
 ##                                                                                            ##
-##                                  SET CAP PARENTING                                        ##
+##                                  SET CAP PARENTING                                         ##
 ##                                                                                            ##
 ################################################################################################
 
@@ -677,11 +595,11 @@ class OBJECT_OT_CreateRoot(bpy.types.Operator):
     bl_idname = "create.root"
     bl_label = "Create Model/Scene"
     
-    def execute(self, context):
+    def execute(self, context): 
         os.system('cls')
-
+        
         scene_collection = bpy.context.scene.collection
-
+        
         # Check if scene_root exists
         if "scene_root" not in bpy.data.objects:
             # Add the empty object
@@ -690,14 +608,7 @@ class OBJECT_OT_CreateRoot(bpy.types.Operator):
             new_object = bpy.context.active_object
             new_object.name = "scene_root"
             # Link to the Scene Collection
-            if new_object.name not in scene_collection.objects:
-                scene_collection.objects.link(new_object)
-            new_object.select_set(False)
-        else:
-            # Ensure the object is part of the scene collection
-            existing_object = bpy.data.objects["scene_root"]
-            if existing_object.name not in scene_collection.objects:
-                scene_collection.objects.link(existing_object)
+            scene_collection.objects.link(new_object)
 
         # Check if model_root_0 exists
         if "model_root_0" not in bpy.data.objects:
@@ -707,16 +618,11 @@ class OBJECT_OT_CreateRoot(bpy.types.Operator):
             new_object = bpy.context.active_object
             new_object.name = "model_root_0"
             # Link to the Scene Collection
-            if new_object.name not in scene_collection.objects:
-                scene_collection.objects.link(new_object)
-            new_object.select_set(False)
-        else:
-            # Ensure the object is part of the scene collection
-            existing_object = bpy.data.objects["model_root_0"]
-            if existing_object.name not in scene_collection.objects:
-                scene_collection.objects.link(existing_object)
-
-        return {'FINISHED'}
+            scene_collection.objects.link(new_object)
+            
+        bpy.ops.object.select_all(action='DESELECT')
+            
+        return {'FINISHED'}  
 
 def getLOD(object):   
     return str(object.name[-1])
