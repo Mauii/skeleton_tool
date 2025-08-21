@@ -37,7 +37,6 @@ class OBJECT_PT_SkeletonTool(bpy.types.Panel):
         
         box = layout.box() 
         box.label(text="Set")
-        
         box.operator("set.armaturemod")
         box.operator("set.g2properties")
         
@@ -49,6 +48,7 @@ class OBJECT_PT_SkeletonTool(bpy.types.Panel):
         box.label(text="Misc") 
         box.operator("remove.parent")
         box.operator("clean.hierarchy")
+        box.operator("origin.geometry")
         
         box = layout.box()
         box.label(text="Select") 

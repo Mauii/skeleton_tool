@@ -3,20 +3,6 @@ import bmesh
 import json
 import os
 import re
-import difflib
-
-# Hierarchy dictionary
-hierarchy = {
-    "head": ("cranium", "cervical"),
-    "torso": ("thoracic", "upper_lumbar", "lower_lumbar"),
-    "hips": ("pelvis", "lfemurYZ", "rfemurYZ"),
-    "l_hand": ("l_d1_j1", "l_d1_j2"),
-    "r_hand": ("r_d1_j1", "r_d1_j2"),
-    "l_arm": ("lradius", "lradiusX"),
-    "r_arm": ("rradius", "rradiusX"),
-    "l_leg": ("ltalus", "ltibia"),
-    "r_leg": ("rtalus", "rtibia")
-}
 
 # Parent mapping
 parents = {
@@ -31,9 +17,6 @@ parents = {
     "r_leg": "hips"
 }
 
-# New hierarchy to store objects
-newhierarchy = {}
-
 ################################################################################################
 ##                                                                                            ##
 ##                                        CREATE TAGS                                         ##
@@ -41,7 +24,21 @@ newhierarchy = {}
 ################################################################################################
 
 class OBJECT_OT_CreateTags(bpy.types.Operator):
-    """Creates tags for model_root_0"""
+    """
+        A class that uses a premade json file to create the original tags
+        used by the game. They have multiple functions and are mandatory.
+        
+        ---------
+        Methods:
+        ---------
+        load_mesh_data(self, file_path)
+            This loads the premade json to be passed on to the next method
+        
+        create_mesh_from_data(self, mesh_data)
+            This actually creates the tags using the previous method.
+            It sets the proper scaling and g2_properties.
+    """
+    
     bl_idname = "create.tags"
     bl_label = "Create Tags"
 
@@ -126,7 +123,7 @@ class OBJECT_OT_CreateTags(bpy.types.Operator):
         object.modifiers.new(name="Armature", type='ARMATURE')
         object.modifiers["Armature"].object = bpy.data.objects["skeleton_root"]
         
-        object.g2_prop_name = stripLOD(object)
+        object.g2_prop_name = object.name[:-2]
         object.g2_prop_shader = ""
         object.g2_prop_scale = 100.0
         object.g2_prop_off = False
@@ -141,7 +138,14 @@ class OBJECT_OT_CreateTags(bpy.types.Operator):
 ################################################################################################
 
 class OBJECT_OT_TagParent(bpy.types.Operator):
-    """Parent all tags"""
+    """
+        This class does exactly as it says. This functions makes sure to parent
+        all existing tags onto their respective 'bodypart'.
+        
+        The 'algorithm' if you can call it that, I choose is fairly simplistic
+        but so long my Python skills do not develop further, it will stay this way.
+    """
+    
     bl_idname = "parent.tags"
     bl_label = "Parent Tags"
 
@@ -186,7 +190,22 @@ class OBJECT_OT_TagParent(bpy.types.Operator):
 ################################################################################################
 
 class OBJECT_OT_BodyParent(bpy.types.Operator):
-    """ Parent all body parts if naming convention is respected """
+    """
+    This class makes sure to parent all 'bodyparts' if the naming convention
+    is respected. It will also make sure that the stupidtriangle(_off) will be
+    deleted once and for all, since it has no use.
+    
+    Methods:
+    parent(self, child_object, parent_object)
+        This method receives 2 objects. The child, which will be parented
+        onto the parent_object.
+    
+    triangulate(self, object)
+        This method saves you the time of having to triangulate the edited,
+        newly created or added 'bodyparts' yourself. Since games work on poly's
+        this is a mandatory step. You will get an ingame error if you don't do this. 
+    """
+    
     bl_idname = "parent.objects"
     bl_label = "Parent Objects"
 
@@ -195,14 +214,14 @@ class OBJECT_OT_BodyParent(bpy.types.Operator):
 
         for object in bpy.data.objects:
 
-            # Skip objects with specific properties
-            if object.g2_prop_off or object.g2_prop_tag or object.name == "scene_root":
-                continue
-            
             # Get rid of the useless stupidtriangle once and for all
             if "stupidtriangle" in object.name:
                 object.select_set(True)
                 bpy.ops.object.delete(use_global=True, confirm=True)
+                continue
+
+            # Skip objects with specific properties
+            if object.g2_prop_off or object.g2_prop_tag or object.name == "scene_root":
                 continue
 
             if object.type == 'MESH':
@@ -212,7 +231,7 @@ class OBJECT_OT_BodyParent(bpy.types.Operator):
                 parent_object = bpy.data.objects["scene_root"]
             
             elif object.name.split("_")[1].isnumeric():
-                parent_object = bpy.data.objects[f"{parents[object.name[:-2]]}_{getLOD(object)}"]
+                parent_object = bpy.data.objects[f"{parents[object.name[:-2]]}_{object.name[-1]}"]
                 
             else:
                 if object.name.startswith("l_") or object.name.startswith("r_"):
@@ -220,14 +239,14 @@ class OBJECT_OT_BodyParent(bpy.types.Operator):
                     # If it is an extra piece
                     if len(object.name.split("_")) > 3:
                         object_names = object.name.split("_")
-                        parent_object = bpy.data.objects[f"{object_names[0]}_{object_names[1]}_{getLOD(object)}"]
+                        parent_object = bpy.data.objects[f"{object_names[0]}_{object_names[1]}_{object.name[-1]}"]
                     
                     # If it is not an extra piece
                     else:
-                        parent_object = bpy.data.objects[f"{parents[object.name[:-2]]}_{getLOD(object)}"]
+                        parent_object = bpy.data.objects[f"{parents[object.name[:-2]]}_{object.name[-1]}"]
                         
                 else:
-                    parent_object = bpy.data.objects[f"{object.name.split('_')[0]}_{getLOD(object)}"]
+                    parent_object = bpy.data.objects[f"{object.name.split('_')[0]}_{object.name[-1]}"]
             
             self.parent(object, parent_object)      
                          
@@ -268,7 +287,12 @@ class OBJECT_OT_BodyParent(bpy.types.Operator):
 ################################################################################################
 
 class OBJECT_OT_CapParent(bpy.types.Operator):
-    """ Parent all caps if naming convention is respected """
+    """
+    This class also makes sure to parent all caps (if made) to their respective 'bodyparts'.
+    The code itself is pretty simplistic aswell, but it works like a charm. So long my python is not
+    improving, this code will stay the way it is.
+    """
+    
     bl_idname = "parent.caps"
     bl_label = "Parent Caps"
 
@@ -315,7 +339,14 @@ class OBJECT_OT_CapParent(bpy.types.Operator):
 ################################################################################################
     
 class OBJECT_OT_SetG2Properties(bpy.types.Operator):
-    """ Prepare objects for export """
+    """
+    This class makes sure to set all g2_properties for all objects within the scene. This is needed for
+    JKA to be able to run this model at all. Even modview needs it.
+    
+    If you want to set a custom shader, change g2_prop_shader after using this function or it will be
+    overwritten by emptiness.
+    """
+    
     bl_idname = "set.g2properties"
     bl_label = "Set G2 Properties"
 
@@ -327,7 +358,7 @@ class OBJECT_OT_SetG2Properties(bpy.types.Operator):
             if object.g2_prop_tag:
                 continue
             
-            object.g2_prop_name = stripLOD(object)
+            object.g2_prop_name = object.name[:-2]
             object.g2_prop_shader = ""
             object.g2_prop_scale = 100.0
                         
@@ -348,7 +379,14 @@ class OBJECT_OT_SetG2Properties(bpy.types.Operator):
 ################################################################################################
    
 class OBJECT_OT_UnparentAll(bpy.types.Operator):
-    """Removes all parents from objects"""
+    """
+    This class simply removes the parent-child relation for all objects, in case you'd need this. It can
+    be useful when frankenstein modeling for example:
+        
+    You want an arm replaced by another model's. Activate this function, remove the arm you don't
+    want and press Parent Objects. 
+    """
+    
     bl_idname = "remove.parent"
     bl_label = "Unparent All"
 
@@ -370,7 +408,12 @@ class OBJECT_OT_UnparentAll(bpy.types.Operator):
 ################################################################################################
     
 class OBJECT_OT_Clean(bpy.types.Operator):
-    """Delete duplicates in hierarchy"""
+    """
+    This class simply deletes every object with a name that ends with atleast .001. I've been needing
+    this when I started with frankenstein modeling for some reason. Just a little tool to quicken some
+    steps.
+    """
+    
     bl_idname = "clean.hierarchy"
     bl_label = "Clean duplicates"
 
@@ -391,7 +434,19 @@ class OBJECT_OT_Clean(bpy.types.Operator):
 ################################################################################################
 
 class OBJECT_OT_CreateSkinFile(bpy.types.Operator):
-    """Create model_default.skin file"""
+    """
+    This class is the cherry on the cake, the beer on a hot summer day, ...
+    It creates the model_default.skin file for you. You make sure to UVMap your objects with the right
+    textures, and this class will do the rest for you. Its use is self explanatory once you press it.
+    
+    Methods:
+    invoke(self, context, event)
+    This method will open a file explorer window so you can select the path where you want to save it.
+    
+    get_image(self, object)
+    This method will try to find the textures you've set on the objects so it can be added in
+    the .skin file.
+    """
     bl_idname = "create.skinfile"
     bl_label = "Create .SKIN"
     
@@ -420,8 +475,6 @@ class OBJECT_OT_CreateSkinFile(bpy.types.Operator):
         col.label(text="Model Name:")
         col = split.column()
         col.prop(props, "modelname", text="")
-
-    
 
     def execute(self, context):       
         props = context.scene.settings
@@ -496,7 +549,19 @@ class OBJECT_OT_CreateSkinFile(bpy.types.Operator):
             return object.active_material.name.split("/")[-1][:-4]
         return image.name[:-4]
 
+################################################################################################
+##                                                                                            ##
+##                                     SELECT OBJECT TYPE                                     ##
+##                                                                                            ##
+################################################################################################
+
 class OBJECT_OT_SelectObjectType(bpy.types.Operator):
+    """
+    This class is a neat little tool if you need a certain object type to be selected.
+    Whether it be tags, caps or the actual 'bodyparts' themselves. It is a multiple choice function,
+    so use it as you see fit.
+    """
+    
     bl_idname = "select.object_type"
     bl_label = "Model part select"
     
@@ -521,8 +586,18 @@ class OBJECT_OT_SelectObjectType(bpy.types.Operator):
                 object.select_set(True)
     
         return {'FINISHED'} 
-    
+
+################################################################################################
+##                                                                                            ##
+##                                        SET ARMATURE                                        ##
+##                                                                                            ##
+################################################################################################
+   
 class OBJECT_OT_SetArmature(bpy.types.Operator):
+    """
+    This class will set the skeleton_root to all objects if they don't have it already.
+    """
+    
     bl_idname = "set.armaturemod"
     bl_label = "Set Armature Modifier"
     
@@ -542,9 +617,19 @@ class OBJECT_OT_SetArmature(bpy.types.Operator):
                 object.modifiers["Armature"].object = bpy.data.objects["skeleton_root"] 
     
         return {'FINISHED'}
-          
+
+################################################################################################
+##                                                                                            ##
+##                                REMOVE EMPTY VERTEX GROUPS                                  ##
+##                                                                                            ##
+################################################################################################         
     
 class OBJECT_OT_RemoveEmptyVertexGroups(bpy.types.Operator):
+    """
+    This class will check every object for empty vertex groups. I like my objects clean, hence why I made
+    it.
+    """
+    
     bl_idname = "remove.emptyvgroups"
     bl_label = "Remove Empty VGroups"
     
@@ -553,11 +638,11 @@ class OBJECT_OT_RemoveEmptyVertexGroups(bpy.types.Operator):
         
         for object in bpy.data.objects:
             
-            if object.g2_prop_off and "_cap_" in object.name or object.g2_prop_tag:
+            if "root" in object.name:
                 continue
             
             # Check if the object is a mesh
-            if object and object.type == 'MESH':
+            if object.type == 'MESH':
                 # List to store vertex groups to remove
                 vertex_groups_to_remove = []
 
@@ -588,51 +673,68 @@ class OBJECT_OT_RemoveEmptyVertexGroups(bpy.types.Operator):
         
         return {'FINISHED'}       
 
+################################################################################################
+##                                                                                            ##
+##                                CREATE SCENE/MODEL ROOT                                     ##
+##                                                                                            ##
+################################################################################################
     
 class OBJECT_OT_CreateRoot(bpy.types.Operator):
+    """
+    This class will get your hierarchy started by creating a model_root_0 and a scene_root if it doesn't
+    exist yet.
+    """
     bl_idname = "create.root"
     bl_label = "Create Model/Scene"
     
     def execute(self, context): 
         os.system('cls')
-        
-        scene_collection = bpy.context.scene.collection
-        
-        # Check if scene_root exists
-        if "scene_root" not in bpy.data.objects:
-            # Add the empty object
-            bpy.ops.object.empty_add(type='PLAIN_AXES', align='WORLD', location=(0, 0, 0), scale=(1, 1, 1))
-            # Rename the newly created object
-            new_object = bpy.context.active_object
-            new_object.name = "scene_root"
-            # Link to the Scene Collection
-            scene_collection.objects.link(new_object)
 
-        # Check if model_root_0 exists
+        scene_collection = bpy.context.scene.collection
+
+        # Ensure 'scene_root' exists
+        if "scene_root" not in bpy.data.objects:
+            bpy.ops.object.empty_add(type='PLAIN_AXES', align='WORLD', location=(0, 0, 0))
+            bpy.context.active_object.name = "scene_root"
+
+        # Ensure 'model_root_0' exists
         if "model_root_0" not in bpy.data.objects:
-            # Add the empty object
-            bpy.ops.object.empty_add(type='PLAIN_AXES', align='WORLD', location=(0, 0, 0), scale=(1, 1, 1))
-            # Rename the newly created object
-            new_object = bpy.context.active_object
-            new_object.name = "model_root_0"
-            # Link to the Scene Collection
-            scene_collection.objects.link(new_object)
-            
+            bpy.ops.object.empty_add(type='PLAIN_AXES', align='WORLD', location=(0, 0, 0))
+            bpy.context.active_object.name = "model_root_0"
+
+        # Deselect everything
         bpy.ops.object.select_all(action='DESELECT')
+
             
         return {'FINISHED'}  
-
-def getLOD(object):   
-    return str(object.name[-1])
     
-def stripLOD(object): 
-    return object.name[:-2]
-
-# Function to find the closest matching key from the dictionary
-def get_closest_key(object_name, dictionary):
-    # Look for close matches based on the object name
-    possible_keys = difflib.get_close_matches(object_name, dictionary.keys(), n=1, cutoff=0.6)
-    return possible_keys[0] if possible_keys else None
+################################################################################################
+##                                                                                            ##
+##                                     ORIGIN TO GEOMETRY                                     ##
+##                                                                                            ##
+################################################################################################
+    
+class OBJECT_OT_Origin_to_Geometry(bpy.types.Operator):
+    """
+    This class will set Origin to Geometry on all objects. A neat little tool when modeling.
+    """
+    
+    bl_idname = "origin.geometry"
+    bl_label = "Set Origin to Geometry"
+    
+    def execute(self, context): 
+        os.system('cls')
+        
+        for object in bpy.context.scene.objects:
+            if object.type == 'MESH':
+                bpy.context.view_layer.objects.active = object
+                obj.select_set(True)
+                bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY', center='BOUNDS')
+                obj.select_set(False)
+                
+        print("Origin to Geometry set on all objects.")
+        
+        return {'FINISHED'}  
 
 def register_operators():
     bpy.utils.register_class(OBJECT_OT_BodyParent)
@@ -647,6 +749,7 @@ def register_operators():
     bpy.utils.register_class(OBJECT_OT_SetArmature)
     bpy.utils.register_class(OBJECT_OT_RemoveEmptyVertexGroups)
     bpy.utils.register_class(OBJECT_OT_CreateRoot)
+    bpy.utils.register_class(OBJECT_OT_Origin_to_Geometry)
     
 def unregister_operators():
     bpy.utils.unregister_class(OBJECT_OT_BodyParent)
@@ -661,3 +764,4 @@ def unregister_operators():
     bpy.utils.unregister_class(OBJECT_OT_SetArmature)
     bpy.utils.unregister_class(OBJECT_OT_RemoveEmptyVertexGroups)
     bpy.utils.unregister_class(OBJECT_OT_CreateRoot)
+    bpy.utils.unregister_class(OBJECT_OT_Origin_to_Geometry)
