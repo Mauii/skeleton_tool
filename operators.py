@@ -18,7 +18,18 @@ hierarchy = {
     "r_leg": ("rtalus", "rtibia")
 }
 
-
+# Parent mapping
+parents = {
+    "head": "torso",
+    "torso": "hips",
+    "hips": "model_root",
+    "l_arm": "torso",
+    "r_arm": "torso",
+    "l_hand": "l_arm",
+    "r_hand": "r_arm",
+    "l_leg": "hips",
+    "r_leg": "hips"
+}
 
 # New hierarchy to store objects
 newhierarchy = {}
@@ -173,19 +184,6 @@ class OBJECT_OT_TagParent(bpy.types.Operator):
 ##                                  SET BODY PARENTING                                        ##
 ##                                                                                            ##
 ################################################################################################
-
-# Parent mapping
-parents = {
-    "head": "torso",
-    "torso": "hips",
-    "hips": "model_root",
-    "l_arm": "torso",
-    "r_arm": "torso",
-    "l_hand": "l_arm",
-    "r_hand": "r_arm",
-    "l_leg": "hips",
-    "r_leg": "hips"
-}
 
 class OBJECT_OT_BodyParent(bpy.types.Operator):
     """ Parent all body parts if naming convention is respected """
