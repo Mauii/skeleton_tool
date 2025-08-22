@@ -1,9 +1,9 @@
 bl_info = {
     "name": "Skeleton Tool",
     "author": "Maui",
-    "version": (3, 1),
-    "blender": (4, 2),
-    "location": "Object Properties -> Skeleton Tool Panel",
+    "version": (3, 5),
+    "blender": (4, 5),
+    "location": "Press N - Select Skeleton tool",
     "description": "This addon has many features that decrease time wasted when preparing a model for JKA.",
     "category": "Modelling / Rigging",
 }

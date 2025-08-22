@@ -226,14 +226,14 @@ class OBJECT_OT_BodyParent(bpy.types.Operator):
             
             if object.type == 'MESH':
                 triangulate(object)
-                
-            parent_object = self.get_parent(object)
             
-            if parent_object:
-                self.set_parent(object, parent_object)
+            try:    
+                parent_object = self.get_parent(object)
                 
-            else:
-                print(f"WARNING: {parent_object.name} not found for {object.name}.")
+                if parent_object:
+                    self.set_parent(object, parent_object)
+            except:
+                print(f"WARNING: {object.name} caused an unknown issue.")
                                  
         return {'FINISHED'}
     
@@ -253,30 +253,36 @@ class OBJECT_OT_BodyParent(bpy.types.Operator):
         return False
     
     def get_parent(self, child: bpy.types.Object) -> bpy.types.Object:
+        if not isinstance(child, bpy.types.Object):
+            raise TypeError(f"{child.name} must be an Object.")
+        
         name_parts = child.name.split("_")
+        
+        try: 
+            # Root objects
+            if "skeleton_root" in child.name or "model_root" in child.name:
+                return bpy.data.objects.get("scene_root")
 
-        # Root objects
-        if "skeleton_root" in child.name or "model_root" in child.name:
-            return bpy.data.objects.get("scene_root")
-
-        # Numeric index in second part of name
-        elif len(name_parts) > 1 and name_parts[1].isnumeric():
-            parent_key = child.name[:-2]
-            return bpy.data.objects.get(f"{parents_dict[parent_key]}_{child.name[-1]}")
-
-        # Left or right
-        elif child.name.startswith(("l_", "r_")):
-            if len(name_parts) > 3:  # extra piece
-                return bpy.data.objects.get(f"{name_parts[0]}_{name_parts[1]}_{child.name[-1]}")
-            
-            else:
+            # Numeric index in second part of name
+            elif len(name_parts) > 1 and name_parts[1].isnumeric():
                 parent_key = child.name[:-2]
                 return bpy.data.objects.get(f"{parents_dict[parent_key]}_{child.name[-1]}")
 
-        # Fallback: use first part of name
-        else:
-            return bpy.data.objects.get(f"{name_parts[0]}_{child.name[-1]}")
-    
+            # Left or right
+            elif child.name.startswith(("l_", "r_")):
+                if len(name_parts) > 3:  # extra piece
+                    return bpy.data.objects.get(f"{name_parts[0]}_{name_parts[1]}_{child.name[-1]}")
+                
+                else:
+                    parent_key = child.name[:-2]
+                    return bpy.data.objects.get(f"{parents_dict[parent_key]}_{child.name[-1]}")
+
+            # Fallback: use first part of name
+            else:
+                return bpy.data.objects.get(f"{name_parts[0]}_{child.name[-1]}")
+        except:
+            print(f"WARNING: {child.name} could not be parented, missing parent object?")
+            
     def set_parent(self, child: bpy.types.Object, parent: bpy.types.Object) -> None:
         if not isinstance(child, bpy.types.Object):
             raise TypeError(f"{child.name} must be an Object.")
@@ -350,7 +356,8 @@ class OBJECT_OT_CapParent(bpy.types.Operator):
         return False
     
     def get_parent(self, child: bpy.types.Object) -> bpy.types.Object:
-        
+        if not isinstance(child, bpy.types.Object):
+            raise TypeError(f"{child.name} must be an Object.")
         # Split the object name into parts
         name_parts = child.name.split("_")
         
