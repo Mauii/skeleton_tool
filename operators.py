@@ -150,11 +150,15 @@ class OBJECT_OT_TagParent(bpy.types.Operator):
                 parent_name = self.get_parent(object)
                 parent_object = bpy.data.objects.get(parent_name)
                 
+            try:
                 # Check if the returned 'parent' actually exists
                 if bpy.data.objects.get(parent_name):
                     self.set_parent(object, parent_object)
                 else:
                     print(f"Warning: Parent '{parent}' for tag '{object.name}' not found.")
+                
+            except:
+                print(f"WARNING: {object.name} caused an unknown issue.")
         
         return {'FINISHED'}
 
