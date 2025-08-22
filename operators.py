@@ -5,7 +5,7 @@ import os
 import re
 
 # Parent mapping
-parents = {
+parents_dict = {
     "head": "torso",
     "torso": "hips",
     "hips": "model_root",
@@ -138,50 +138,72 @@ class OBJECT_OT_CreateTags(bpy.types.Operator):
 ################################################################################################
 
 class OBJECT_OT_TagParent(bpy.types.Operator):
-    """
-        This class does exactly as it says. This functions makes sure to parent
-        all existing tags onto their respective 'bodypart'.
-        
-        The 'algorithm' if you can call it that, I choose is fairly simplistic
-        but so long my Python skills do not develop further, it will stay this way.
-    """
+    """ Parent Tag to its respective Body Part """
     
     bl_idname = "parent.tags"
     bl_label = "Parent Tags"
 
     def execute(self, context):
         for object in bpy.data.objects:
-            if object.g2_prop_tag:  # Check if the object is a tag
+            
+            if object.g2_prop_tag:  # Check if the object is a tag                 
+                parent_name = self.get_parent(object)
+                parent_object = bpy.data.objects.get(parent_name)
                 
-                # Ignore the first character and split the name
-                name_parts = object.name[1:].split('_')
-                
-                # Determine the parent based on the naming conventions
-                if name_parts[0] in {"l", "r"}:  # Left or right tags
-                    parent = f"{name_parts[0]}_{name_parts[1]}_{name_parts[-1]}"
-                elif f"{name_parts[0]}_{name_parts[-1]}" in bpy.data.objects:
-                    parent = f"{name_parts[0]}_{name_parts[-1]}"
-                elif name_parts[0] == "hip":
-                    parent = f"hips_{name_parts[-1]}"
-                else:
-                    parent = f"torso_{name_parts[-1]}"
-                
-                # Check if the parent exists
-                parent_object = bpy.data.objects.get(parent)
-                if parent_object:
-                    # Copy the world matrix of the child object
-                    matrixcopy = object.matrix_world.copy()
-                    
-                    # Set the parent
-                    object.parent = parent_object
-                    
-                    # Restore the world matrix of the child object
-                    object.matrix_world = matrixcopy
+                # Check if the returned 'parent' actually exists
+                if bpy.data.objects.get(parent_name):
+                    self.set_parent(object, parent_object)
                 else:
                     print(f"Warning: Parent '{parent}' for tag '{object.name}' not found.")
         
         return {'FINISHED'}
 
+    def get_parent(self, object: bpy.types.Object) -> bpy.types.Object:
+        if not isinstance(object, bpy.types.Object):
+            raise TypeError(f"{object.name} must be an Object.")
+        
+        try:
+            name_parts = object.name[1:].split('_')
+            base = name_parts[0]
+            lod = name_parts[-1]
+            
+            # left check
+            if base in 'l':
+                return f"l_{name_parts[1]}_{lod}"
+            
+            # right check
+            if base in 'r':
+                return f"r_{name_parts[1]}_{lod}"
+            
+            # hips check
+            if "hip" in base:
+                return f"hips_{lod}"
+            
+            # fallback to torso
+            return f"torso_{lod}"
+        except:
+            print(f"WARNING: {object.name} caused an unknown problem.")
+        
+    def set_parent(self, child: bpy.types.Object, parent: bpy.types.Object) -> None:
+        if not isinstance(child, bpy.types.Object):
+            raise TypeError(f"{child.name} must be an Object.")
+
+        if not isinstance(parent, bpy.types.Object):
+            raise TypeError(f"{parent.name} must be an Object.")
+        
+        try:
+            # Copy the world matrix
+            matrixcopy = child.matrix_world.copy()
+            
+            # Set the parent
+            child.parent = parent
+            
+            # Restore the world transform
+            child.matrix_world = matrixcopy
+            
+            print(f"{child.name} parented to {parent.name}")
+        except:
+            print(f"WARNING: unknown issue occured while parenting {child.name} to {parent.name}")
 
 ################################################################################################
 ##                                                                                            ##
@@ -190,21 +212,7 @@ class OBJECT_OT_TagParent(bpy.types.Operator):
 ################################################################################################
 
 class OBJECT_OT_BodyParent(bpy.types.Operator):
-    """
-    This class makes sure to parent all 'bodyparts' if the naming convention
-    is respected. It will also make sure that the stupidtriangle(_off) will be
-    deleted once and for all, since it has no use.
-    
-    Methods:
-    parent(self, child_object, parent_object)
-        This method receives 2 objects. The child, which will be parented
-        onto the parent_object.
-    
-    triangulate(self, object)
-        This method saves you the time of having to triangulate the edited,
-        newly created or added 'bodyparts' yourself. Since games work on poly's
-        this is a mandatory step. You will get an ingame error if you don't do this. 
-    """
+    """ Parent all child objects (other than caps/tags) to their respective parents """
     
     bl_idname = "parent.objects"
     bl_label = "Parent Objects"
@@ -213,73 +221,84 @@ class OBJECT_OT_BodyParent(bpy.types.Operator):
         os.system('cls')  # Clears the console (Windows only)
 
         for object in bpy.data.objects:
-
-            # Get rid of the useless stupidtriangle once and for all
-            if "stupidtriangle" in object.name:
-                object.select_set(True)
-                bpy.ops.object.delete(use_global=True, confirm=True)
+            if self.should_skip(object):
                 continue
-
-            # Skip objects with specific properties
-            if object.g2_prop_off or object.g2_prop_tag or object.name == "scene_root":
-                continue
-
-            if object.type == 'MESH':
-                self.triangulate(object)  # Triangulate the object
-
-            if "skeleton_root" in object.name or "model_root" in object.name:
-                parent_object = bpy.data.objects["scene_root"]
             
-            elif object.name.split("_")[1].isnumeric():
-                parent_object = bpy.data.objects[f"{parents[object.name[:-2]]}_{object.name[-1]}"]
+            if object.type == 'MESH':
+                triangulate(object)
+                
+            parent_object = self.get_parent(object)
+            
+            if parent_object:
+                self.set_parent(object, parent_object)
                 
             else:
-                if object.name.startswith("l_") or object.name.startswith("r_"):
-                    
-                    # If it is an extra piece
-                    if len(object.name.split("_")) > 3:
-                        object_names = object.name.split("_")
-                        parent_object = bpy.data.objects[f"{object_names[0]}_{object_names[1]}_{object.name[-1]}"]
-                    
-                    # If it is not an extra piece
-                    else:
-                        parent_object = bpy.data.objects[f"{parents[object.name[:-2]]}_{object.name[-1]}"]
-                        
-                else:
-                    parent_object = bpy.data.objects[f"{object.name.split('_')[0]}_{object.name[-1]}"]
-            
-            self.parent(object, parent_object)      
-                         
+                print(f"WARNING: {parent_object.name} not found for {object.name}.")
+                                 
         return {'FINISHED'}
-        
-    def parent(self, child_object, parent_object):
-        # Copy the world matrix of the child object
-        matrixcopy = child_object.matrix_world.copy()
-
-        # Set the parent
-        child_object.parent = parent_object
-
-        # Restore the world matrix of the child object
-        child_object.matrix_world = matrixcopy
     
-    def triangulate(self, object):
-        # Iterate through all objects in the scene
-        for object in bpy.data.objects:
-            # Check if the object is a mesh
-            if object.type == 'MESH':
-                mesh = object.data
+    def should_skip(self, object: bpy.types.Object) -> bool:        
+        if not isinstance(object, bpy.types.Object):
+            raise TypeError(f"{object.name} must be an Object.")
+        
+        if "stupidtriangle" in object.name:
+            print(f"{object.name} deleted.")
+            object.select_set(True)
+            bpy.ops.object.delete(use_global=True, confirm=True)
+            return True
+        
+        if object.g2_prop_tag or object.name == "scene_root" or "_cap_" in object.name:
+            return True
+        
+        return False
+    
+    def get_parent(self, child: bpy.types.Object) -> bpy.types.Object:
+        name_parts = child.name.split("_")
 
-                # Check for non-triangulated faces
-                if any(len(face.vertices) > 3 for face in mesh.polygons):
-                    object.modifiers.new(name="Triangulate", type='TRIANGULATE')
-                    object.modifiers['Triangulate'].quad_method = 'BEAUTY'
-                    object.modifiers['Triangulate'].ngon_method = 'BEAUTY'
-                    object.modifiers['Triangulate'].min_vertices = 4  # Minimum vertices for ngons
+        # Root objects
+        if "skeleton_root" in child.name or "model_root" in child.name:
+            return bpy.data.objects.get("scene_root")
 
-                    # Apply the modifier
-                    bpy.context.view_layer.objects.active = object
-                    bpy.ops.object.modifier_apply(modifier="Triangulate")
-                    
+        # Numeric index in second part of name
+        elif len(name_parts) > 1 and name_parts[1].isnumeric():
+            parent_key = child.name[:-2]
+            return bpy.data.objects.get(f"{parents_dict[parent_key]}_{child.name[-1]}")
+
+        # Left or right
+        elif child.name.startswith(("l_", "r_")):
+            if len(name_parts) > 3:  # extra piece
+                return bpy.data.objects.get(f"{name_parts[0]}_{name_parts[1]}_{child.name[-1]}")
+            
+            else:
+                parent_key = child.name[:-2]
+                return bpy.data.objects.get(f"{parents_dict[parent_key]}_{child.name[-1]}")
+
+        # Fallback: use first part of name
+        else:
+            return bpy.data.objects.get(f"{name_parts[0]}_{child.name[-1]}")
+    
+    def set_parent(self, child: bpy.types.Object, parent: bpy.types.Object) -> None:
+        if not isinstance(child, bpy.types.Object):
+            raise TypeError(f"{child.name} must be an Object.")
+
+        if not isinstance(parent, bpy.types.Object):
+            raise TypeError(f"{parent.name} must be an Object.")
+        
+        try:
+            # Copy the world matrix
+            matrixcopy = child.matrix_world.copy()
+            
+            # Set the parent
+            child.parent = parent
+            
+            # Restore the world transform
+            child.matrix_world = matrixcopy
+            
+            print(f"{child.name} parented to {parent.name}")
+            
+        except:
+            print("Something went wrong with parenting {child.name} to {parent.name}")
+            
 ################################################################################################
 ##                                                                                            ##
 ##                                  SET CAP PARENTING                                         ##
@@ -287,50 +306,79 @@ class OBJECT_OT_BodyParent(bpy.types.Operator):
 ################################################################################################
 
 class OBJECT_OT_CapParent(bpy.types.Operator):
-    """
-    This class also makes sure to parent all caps (if made) to their respective 'bodyparts'.
-    The code itself is pretty simplistic aswell, but it works like a charm. So long my python is not
-    improving, this code will stay the way it is.
-    """
+    """ Parent all caps to their respective body parts """
     
     bl_idname = "parent.caps"
     bl_label = "Parent Caps"
-
+    
     def execute(self, context):
         os.system('cls')  # Clears the console (Windows only)
 
         for object in bpy.data.objects:
-            # Process only objects with g2_prop_off
-            if object.g2_prop_off:
-                # Split the object name into parts
-                name_parts = object.name.split("_")
+            try:
+                if self.should_skip(object):
+                    continue
                 
-                if name_parts[0] in {"l", "r"}:
-                    # Handle cases like l_arm_cap_0
-                    parent_name = f"{name_parts[0]}_{name_parts[1]}_{name_parts[-1]}"
-                else:
-                    # Handle cases like torso_cap_0
-                    parent_name = f"{name_parts[0]}_{name_parts[-1]}"
-
-                # Look for the parent object
-                parent_object = bpy.data.objects.get(parent_name)
-                
-                if parent_object:
-                    # Copy the world matrix of the child object
-                    matrixcopy = object.matrix_world.copy()
-
-                    # Set the parent
-                    object.parent = parent_object
-
-                    # Restore the world matrix of the child object
-                    object.matrix_world = matrixcopy
-                else:
-                    # Print a warning if the parent object is not found
-                    print(f"Warning: Parent '{parent_name}' not found for '{object.name}'")
-            else:
-                continue
+                if object.type == 'MESH':
+                    triangulate(object)
+                    
+                    parent_object = self.get_parent(object)
+                    
+                    if parent_object:
+                        self.set_parent(object, parent_object)
+                    else:
+                        print(f"WARNING: {parent_object.name} not found for {object.name}.")
                         
+            except:
+                print(f"WARNING: unknown issue occured with {object.name}")
+                                     
         return {'FINISHED'}
+    
+    def should_skip(self, object: bpy.types.Object) -> bool:        
+        if not isinstance(object, bpy.types.Object):
+            raise TypeError(f"{object.name} must be an Object.")
+        
+        if "stupidtriangle" in object.name:
+            print(f"{object.name} deleted.")
+            object.select_set(True)
+            bpy.ops.object.delete(use_global=True, confirm=True)
+            return True
+        
+        if "_cap_" not in object.name or object.g2_prop_tag:
+            return True
+        
+        return False
+    
+    def get_parent(self, child: bpy.types.Object) -> bpy.types.Object:
+        
+        # Split the object name into parts
+        name_parts = child.name.split("_")
+        
+        # Handle cases like l_arm_cap_0
+        if name_parts[0] in {"l", "r"}:
+            return bpy.data.objects.get(f"{name_parts[0]}_{name_parts[1]}_{name_parts[-1]}")
+        
+        # Handle cases like torso_cap_0
+        return bpy.data.objects.get(f"{name_parts[0]}_{name_parts[-1]}")
+    
+    def set_parent(self, child: bpy.types.Object, parent: bpy.types.Object) -> None:
+        if not isinstance(child, bpy.types.Object):
+            raise TypeError(f"{child.name} must be an Object.")
+
+        if not isinstance(parent, bpy.types.Object):
+            raise TypeError(f"{parent.name} must be an Object.")
+        
+        try:
+            # Copy the world matrix
+            matrixcopy = child.matrix_world.copy()          
+            # Set the parent
+            child.parent = parent 
+            # Restore the world transform
+            child.matrix_world = matrixcopy       
+            print(f"{child.name} parented to {parent.name}")
+            
+        except:
+            print("Something went wrong with parenting {child.name} to {parent.name}")
 
 ################################################################################################
 ##                                                                                            ##
@@ -355,23 +403,48 @@ class OBJECT_OT_SetG2Properties(bpy.types.Operator):
         
         for object in bpy.data.objects:
             
-            if object.g2_prop_tag:
+            if self.should_skip(object):
                 continue
             
-            object.g2_prop_name = object.name[:-2]
-            object.g2_prop_shader = ""
-            object.g2_prop_scale = 100.0
-                        
-            if "_off" in object.name[:-2]:
-                object.g2_prop_off = True
-                object.g2_prop_tag = False
-                
-            else:
-                object.g2_prop_off = False
-                object.g2_prop_tag = False
+            self.set_g2_properties(object)
                                      
         return {'FINISHED'}
 
+    def should_skip(self, object: bpy.types.Object) -> bool:        
+        if not isinstance(object, bpy.types.Object):
+            raise TypeError(f"{object.name} must be an Object.")
+        
+        if "stupidtriangle" in object.name:
+            print(f"{object.name} deleted.")
+            object.select_set(True)
+            bpy.ops.object.delete(use_global=True, confirm=True)
+            return True
+        
+        if "root" in object.name:
+            return True
+        
+        return False
+
+
+    def set_g2_properties(self, object: bpy.types.Object) -> None:
+        if not isinstance(object, bpy.types.Object):
+            raise TypeError(f"{object.name} must be an Object.")
+
+        object.g2_prop_name = object.name[:-2]
+        object.g2_prop_shader = ""
+        object.g2_prop_scale = 100.0
+                    
+        if "_off" in object.name[:-2]:
+            object.g2_prop_off = True
+            object.g2_prop_tag = False
+            
+        elif object.name.startswith("*"):
+            object.g2_prop_tag = True
+            
+        else:
+            object.g2_prop_off = False
+            object.g2_prop_tag = False
+        
 ################################################################################################
 ##                                                                                            ##
 ##                               REMOVE ALL PARENTING                                         ##
@@ -379,13 +452,7 @@ class OBJECT_OT_SetG2Properties(bpy.types.Operator):
 ################################################################################################
    
 class OBJECT_OT_UnparentAll(bpy.types.Operator):
-    """
-    This class simply removes the parent-child relation for all objects, in case you'd need this. It can
-    be useful when frankenstein modeling for example:
-        
-    You want an arm replaced by another model's. Activate this function, remove the arm you don't
-    want and press Parent Objects. 
-    """
+    """ Remove all child-parent relations """
     
     bl_idname = "remove.parent"
     bl_label = "Unparent All"
@@ -408,11 +475,7 @@ class OBJECT_OT_UnparentAll(bpy.types.Operator):
 ################################################################################################
     
 class OBJECT_OT_Clean(bpy.types.Operator):
-    """
-    This class simply deletes every object with a name that ends with atleast .001. I've been needing
-    this when I started with frankenstein modeling for some reason. Just a little tool to quicken some
-    steps.
-    """
+    """ Delete all objects with atleast .00 in their names """
     
     bl_idname = "clean.hierarchy"
     bl_label = "Clean duplicates"
@@ -420,7 +483,8 @@ class OBJECT_OT_Clean(bpy.types.Operator):
     def execute(self, context): 
         os.system('cls')
         
-        for object in bpy.data.objects:         
+        for object in bpy.data.objects:   
+                  
             if ".00" in object.name:
                 object.select_set(True)
                 bpy.ops.object.delete(use_global=True, confirm=True)
@@ -434,19 +498,7 @@ class OBJECT_OT_Clean(bpy.types.Operator):
 ################################################################################################
 
 class OBJECT_OT_CreateSkinFile(bpy.types.Operator):
-    """
-    This class is the cherry on the cake, the beer on a hot summer day, ...
-    It creates the model_default.skin file for you. You make sure to UVMap your objects with the right
-    textures, and this class will do the rest for you. Its use is self explanatory once you press it.
-    
-    Methods:
-    invoke(self, context, event)
-    This method will open a file explorer window so you can select the path where you want to save it.
-    
-    get_image(self, object)
-    This method will try to find the textures you've set on the objects so it can be added in
-    the .skin file.
-    """
+    """ Create a model_default.skin file """
     bl_idname = "create.skinfile"
     bl_label = "Create .SKIN"
     
@@ -513,10 +565,10 @@ class OBJECT_OT_CreateSkinFile(bpy.types.Operator):
             self.report({'ERROR'}, f"Failed to create .skin file: {e}")
             return {'CANCELLED'}
     
-    def invoke(self, context, event):
+    def invoke(self, context, event) -> None:
         return context.window_manager.invoke_props_dialog(self)
     
-    def get_image(self, object):
+    def get_image(self, object) -> str:
         if object.active_material:
             material = object.active_material
             
@@ -556,11 +608,7 @@ class OBJECT_OT_CreateSkinFile(bpy.types.Operator):
 ################################################################################################
 
 class OBJECT_OT_SelectObjectType(bpy.types.Operator):
-    """
-    This class is a neat little tool if you need a certain object type to be selected.
-    Whether it be tags, caps or the actual 'bodyparts' themselves. It is a multiple choice function,
-    so use it as you see fit.
-    """
+    """ Select all (caps/tags/objects) or both """
     
     bl_idname = "select.object_type"
     bl_label = "Model part select"
@@ -571,21 +619,43 @@ class OBJECT_OT_SelectObjectType(bpy.types.Operator):
         bpy.ops.object.select_all(action='DESELECT')
         
         settings = bpy.context.scene.settings
+        scene_collection = bpy.context.scene.collection
             
         for object in bpy.data.objects:
-            if object.type == "EMPTY" or object.type == "ARMATURE":
+            if self.should_skip(object):
                 continue
             
-            if settings.meshes and (not object.g2_prop_tag and "_cap_" not in object.name):
-                object.select_set(True)
-            
-            if settings.tags and object.g2_prop_tag:
-                object.select_set(True)
-            
-            if settings.caps and object.g2_prop_off:
-                object.select_set(True)
-    
+            try:
+                if settings.meshes and (not object.g2_prop_tag and "_cap_" not in object.name):
+                    object.select_set(True)
+                
+                if settings.tags and object.g2_prop_tag:
+                    object.select_set(True)
+                
+                if settings.caps and object.g2_prop_off:
+                    object.select_set(True)
+            except:
+                if object.name not in scene_collection.objects:
+                    print(f"WARNING: {object.name} was not selected. It's in a different collection.")
+                else:
+                    print(f"WARNING: {object.name} was not selected, reason unknown.")
+        
         return {'FINISHED'} 
+    
+    def should_skip(self, object: bpy.types.Object) -> bool:        
+        if not isinstance(object, bpy.types.Object):
+            raise TypeError(f"{object.name} must be an Object.")
+        
+        if "stupidtriangle" in object.name:
+            print(f"{object.name} deleted.")
+            object.select_set(True)
+            bpy.ops.object.delete(use_global=True, confirm=True)
+            return True
+        
+        if object.type != 'MESH':
+            return True
+        
+        return False
 
 ################################################################################################
 ##                                                                                            ##
@@ -606,17 +676,33 @@ class OBJECT_OT_SetArmature(bpy.types.Operator):
 
         for object in bpy.data.objects:
         
-            if object.type == 'MESH':
-                
-                # Make sure we have only 1 armature modifier
-                for mod in object.modifiers:    
-                    if mod.type == 'ARMATURE':
-                        object.modifiers.remove(mod)
-                
-                object.modifiers.new("Armature", type="ARMATURE")       
-                object.modifiers["Armature"].object = bpy.data.objects["skeleton_root"] 
+            if self.should_skip(object):
+                continue
+            
+            # Make sure we have only 1 armature modifier
+            for mod in object.modifiers:    
+                if mod.type == 'ARMATURE':
+                    object.modifiers.remove(mod)
+            
+            object.modifiers.new("Armature", type="ARMATURE")       
+            object.modifiers["Armature"].object = bpy.data.objects["skeleton_root"] 
     
         return {'FINISHED'}
+    
+    def should_skip(self, object: bpy.types.Object) -> bool:        
+        if not isinstance(object, bpy.types.Object):
+            raise TypeError(f"{object.name} must be an Object.")
+        
+        if "stupidtriangle" in object.name:
+            print(f"{object.name} deleted.")
+            object.select_set(True)
+            bpy.ops.object.delete(use_global=True, confirm=True)
+            return True
+        
+        if object.type != 'MESH':
+            return True
+        
+        return False
 
 ################################################################################################
 ##                                                                                            ##
@@ -636,42 +722,62 @@ class OBJECT_OT_RemoveEmptyVertexGroups(bpy.types.Operator):
     def execute(self, context):      
         os.system('cls')
         
-        for object in bpy.data.objects:
-            
-            if "root" in object.name:
-                continue
-            
-            # Check if the object is a mesh
-            if object.type == 'MESH':
-                # List to store vertex groups to remove
-                vertex_groups_to_remove = []
-
-                # Iterate through the vertex groups
-                for vgroup in object.vertex_groups:
-                    # Initialize the count and weight sum for this vertex group
-                    count = 0
-                    weight_sum = 0.0
-                    
-                    # Count the number of vertices assigned to this vertex group and their weights
-                    for vertex in object.data.vertices:
-                        for group in vertex.groups:
-                            if group.group == vgroup.index:
-                                count += 1
-                                weight_sum += group.weight  # Get the weight of the vertex for this group
-                                break  # No need to check other groups for this vertex
-                    
-                    # Check the conditions: count < 5 or weight_sum < 0.50
-                    if count < 5 or weight_sum < 0.100:
-                        vertex_groups_to_remove.append(vgroup)
-
-                # Remove the empty vertex groups
-                for vgroup in vertex_groups_to_remove:
-                    object.vertex_groups.remove(vgroup)
-
-            else:
-                print("The active object is not a mesh or no object is selected.")
+        try:
+            for object in bpy.data.objects:
+                
+                if self.should_skip(object):
+                    continue
+                
+                self.remove_vertex_groups(object)
+        except:
+            print(f"WARNING: No possible object selected.")
+    
+        return {'FINISHED'}
+    
+    def should_skip(self, object: bpy.types.Object) -> bool:        
+        if not isinstance(object, bpy.types.Object):
+            raise TypeError(f"{object.name} must be an Object.")
         
-        return {'FINISHED'}       
+        if "stupidtriangle" in object.name:
+            print(f"{object.name} deleted.")
+            object.select_set(True)
+            bpy.ops.object.delete(use_global=True, confirm=True)
+            return True
+        
+        if object.type != 'MESH' or "root" in object.name:
+            return True
+        
+        return False       
+
+    def remove_vertex_groups(self, object: bpy.types.Object) -> None:
+        if not isinstance(object, bpy.types.Object):
+            raise TypeError(f"{object.name} must be an Object.")
+                    
+        # List to store vertex groups to remove
+        vertex_groups_to_remove = []
+
+        # Iterate through the vertex groups
+        for vgroup in object.vertex_groups:
+            # Initialize the count and weight sum for this vertex group
+            count = 0
+            weight_sum = 0.0
+            
+            # Count the number of vertices assigned to this vertex group and their weights
+            for vertex in object.data.vertices:
+                for group in vertex.groups:
+                    if group.group == vgroup.index:
+                        count += 1
+                        weight_sum += group.weight  # Get the weight of the vertex for this group
+                        break  # No need to check other groups for this vertex
+            
+            # Check the conditions: count < 5 or weight_sum < 0.50
+            if count < 5 or weight_sum < 0.100:
+                vertex_groups_to_remove.append(vgroup)
+
+        # Remove the empty vertex groups
+        for vgroup in vertex_groups_to_remove:
+            object.vertex_groups.remove(vgroup)
+
 
 ################################################################################################
 ##                                                                                            ##
@@ -680,10 +786,7 @@ class OBJECT_OT_RemoveEmptyVertexGroups(bpy.types.Operator):
 ################################################################################################
     
 class OBJECT_OT_CreateRoot(bpy.types.Operator):
-    """
-    This class will get your hierarchy started by creating a model_root_0 and a scene_root if it doesn't
-    exist yet.
-    """
+    """ Create scene_root and model_root_0 """
     bl_idname = "create.root"
     bl_label = "Create Model/Scene"
     
@@ -714,10 +817,8 @@ class OBJECT_OT_CreateRoot(bpy.types.Operator):
 ##                                                                                            ##
 ################################################################################################
     
-class OBJECT_OT_Origin_to_Geometry(bpy.types.Operator):
-    """
-    This class will set Origin to Geometry on all objects. A neat little tool when modeling.
-    """
+class OBJECT_OT_OrigintoGeometry(bpy.types.Operator):
+    """ Set Origin to Geometry on all objects """
     
     bl_idname = "origin.geometry"
     bl_label = "Set Origin to Geometry"
@@ -728,13 +829,30 @@ class OBJECT_OT_Origin_to_Geometry(bpy.types.Operator):
         for object in bpy.context.scene.objects:
             if object.type == 'MESH':
                 bpy.context.view_layer.objects.active = object
-                obj.select_set(True)
+                object.select_set(True)
                 bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY', center='BOUNDS')
-                obj.select_set(False)
+                object.select_set(False)
                 
         print("Origin to Geometry set on all objects.")
         
-        return {'FINISHED'}  
+        return {'FINISHED'} 
+    
+def triangulate(object: bpy.types.Object) -> None:
+    if not isinstance(object, bpy.types.Object):
+        raise TypeError(f"{object.name} must be an Object.")
+    
+    mesh = object.data
+
+    # Check for non-triangulated faces
+    if any(len(face.vertices) > 3 for face in mesh.polygons):
+        object.modifiers.new(name="Triangulate", type='TRIANGULATE')
+        object.modifiers['Triangulate'].quad_method = 'BEAUTY'
+        object.modifiers['Triangulate'].ngon_method = 'BEAUTY'
+        object.modifiers['Triangulate'].min_vertices = 4  # Minimum vertices for ngons
+
+        # Apply the modifier
+        bpy.context.view_layer.objects.active = object
+        bpy.ops.object.modifier_apply(modifier="Triangulate") 
 
 def register_operators():
     bpy.utils.register_class(OBJECT_OT_BodyParent)
@@ -749,7 +867,7 @@ def register_operators():
     bpy.utils.register_class(OBJECT_OT_SetArmature)
     bpy.utils.register_class(OBJECT_OT_RemoveEmptyVertexGroups)
     bpy.utils.register_class(OBJECT_OT_CreateRoot)
-    bpy.utils.register_class(OBJECT_OT_Origin_to_Geometry)
+    bpy.utils.register_class(OBJECT_OT_OrigintoGeometry)
     
 def unregister_operators():
     bpy.utils.unregister_class(OBJECT_OT_BodyParent)
@@ -764,4 +882,4 @@ def unregister_operators():
     bpy.utils.unregister_class(OBJECT_OT_SetArmature)
     bpy.utils.unregister_class(OBJECT_OT_RemoveEmptyVertexGroups)
     bpy.utils.unregister_class(OBJECT_OT_CreateRoot)
-    bpy.utils.unregister_class(OBJECT_OT_Origin_to_Geometry)
+    bpy.utils.unregister_class(OBJECT_OT_OrigintoGeometry)
