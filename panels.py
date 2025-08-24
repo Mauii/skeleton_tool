@@ -11,47 +11,48 @@ class OBJECT_PT_SkeletonTool(bpy.types.Panel):
     bl_options = {'DEFAULT_CLOSED'}
     
     def draw(self, context): 
-        ''' Sized box which can encompass all the buttons, could be more adjusted.
-        Keep parent buttons as different in the Playermodel tag; set create LODs within the function
-        and send create tags to misc and disabled cause it's not working'''
         layout = self.layout
-        
-        layout.ui_units_x = 14.0 
-        layout.ui_units_y = 14.0
-        
+
+        layout.ui_units_x = 10.0
+        layout.ui_units_y = 10.0
+
         settings = context.scene.settings
-               
-        box = layout.box() 
+
+        box = layout.box()
         box.label(text="Parenting")
-        
+        box.operator("parent.all")
         box.operator("parent.objects")
         box.operator("parent.tags")
         box.operator("parent.caps")
+        box.operator("remove.parent")
+
+        box = layout.box()
+        box.label(text="Replace")
         
-        box = layout.box() 
+        layout.prop(settings, "object1")
+        layout.prop(settings, "object2")
+        layout.operator("object.replace_object", icon="ARROW_LEFTRIGHT")
+
+        box = layout.box()
         box.label(text="Create")
-        
+
         box.operator("create.tags")
         box.operator("create.root")
         box.operator("create.skinfile")
-        
-        box = layout.box() 
+
+        box = layout.box()
         box.label(text="Set")
         box.operator("set.armaturemod")
         box.operator("set.g2properties")
-        
-        box = layout.box()
-        box.label(text="Vertex Groups")
-        box.operator("remove.emptyvgroups")
-         
-        box = layout.box()
-        box.label(text="Misc") 
-        box.operator("remove.parent")
-        box.operator("clean.hierarchy")
         box.operator("origin.geometry")
-        
+
         box = layout.box()
-        box.label(text="Select") 
+        box.label(text="Cleanup")
+        box.operator("remove.emptyvgroups")
+        box.operator("clean.hierarchy")
+
+        box = layout.box()
+        box.label(text="Select")
         box.operator("select.object_type")
         box.prop(settings, "meshes")
         box.prop(settings, "caps")

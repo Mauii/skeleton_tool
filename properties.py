@@ -15,6 +15,9 @@ class AddonProperties(bpy.types.PropertyGroup):
     
     shadername: bpy.props.StringProperty(name="Enter .skin name", default= "default")
     modelname: bpy.props.StringProperty(name="Enter model name", default="")
+    
+    object1: bpy.props.StringProperty(name="Object 1", search=lambda self, context, edit_text: [o.name for o in bpy.data.objects if edit_text.lower() in o.name.lower()])
+    object2: bpy.props.StringProperty(name="Object 2", search=lambda self, context, edit_text: [o.name for o in bpy.data.objects if edit_text.lower() in o.name.lower()])
 
 def register_properties():
     bpy.utils.register_class(AddonProperties)

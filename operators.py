@@ -41,6 +41,7 @@ class OBJECT_OT_CreateTags(bpy.types.Operator):
     
     bl_idname = "create.tags"
     bl_label = "Create Tags"
+    bl_description = "Create all tags (if not existing yet)"
 
     def execute(self, context):
         # Get the current directory of the addon
@@ -138,18 +139,36 @@ class OBJECT_OT_CreateTags(bpy.types.Operator):
 ################################################################################################
 
 class OBJECT_OT_TagParent(bpy.types.Operator):
-    """ Parent Tag to its respective Body Part """
+    """ 
+    A class that parents all tags to their respective parents. (it will ignore some if the parent is not found).
+    
+    ---------
+    Methods:
+    ---------
+    get_parent(self, object)
+        This takes an object and does a simple algorithm to find a suitable parent.
+    
+    set_parent(self, child, parent)
+        This takes the child and parent (found with get_parent) object and does the actual parenting.
+        
+    should_skip(self, object)
+        This runs a check if it is a stupidtriangle or a specific reason to skip the current object.
+        If none of these have a reason to skip, it will return False so the main function continues. 
+    """
     
     bl_idname = "parent.tags"
     bl_label = "Parent Tags"
+    bl_description = "Parent all tags to their respective parents."
 
     def execute(self, context):
         for object in bpy.data.objects:
             
-            if object.g2_prop_tag:  # Check if the object is a tag                 
-                parent_name = self.get_parent(object)
-                parent_object = bpy.data.objects.get(parent_name)
-                
+            if self.should_skip(object):
+                continue
+                             
+            parent_name = self.get_parent(object)
+            parent_object = bpy.data.objects.get(parent_name)
+            
             try:
                 # Check if the returned 'parent' actually exists
                 if bpy.data.objects.get(parent_name):
@@ -180,9 +199,13 @@ class OBJECT_OT_TagParent(bpy.types.Operator):
                 return f"r_{name_parts[1]}_{lod}"
             
             # hips check
-            if "hip" in base:
+            if base in "hips":
                 return f"hips_{lod}"
             
+            #head check
+            if base in "head":
+                return f"head_{lod}"
+                
             # fallback to torso
             return f"torso_{lod}"
         except:
@@ -208,6 +231,22 @@ class OBJECT_OT_TagParent(bpy.types.Operator):
             print(f"{child.name} parented to {parent.name}")
         except:
             print(f"WARNING: unknown issue occured while parenting {child.name} to {parent.name}")
+            
+    def should_skip(self, object: bpy.types.Object) -> bool:        
+        if not isinstance(object, bpy.types.Object):
+            raise TypeError(f"{object.name} must be an Object.")
+        
+        if "stupidtriangle" in object.name:
+            print(f"{object.name} deleted.")
+            object.select_set(True)
+            bpy.ops.object.delete(use_global=True, confirm=True)
+            return True
+        
+        if not object.g2_prop_tag:
+            return True
+        
+        return False
+
 
 ################################################################################################
 ##                                                                                            ##
@@ -216,10 +255,27 @@ class OBJECT_OT_TagParent(bpy.types.Operator):
 ################################################################################################
 
 class OBJECT_OT_BodyParent(bpy.types.Operator):
-    """ Parent all child objects (other than caps/tags) to their respective parents """
+    """ 
+    A class that parents all objects to their respective parents. (it will ignore some if the parent is not found).
+    Also, it will check if the objects have non-triangulated faces and apply triangulate if needed.
+    
+    ---------
+    Methods:
+    ---------
+    get_parent(self, object)
+        This takes an object and does a simple algorithm to find a suitable parent.
+    
+    set_parent(self, child, parent)
+        This takes the child and parent (found with get_parent) object and does the actual parenting.
+        
+    should_skip(self, object)
+        This runs a check if it is a stupidtriangle or a specific reason to skip the current object.
+        If none of these have a reason to skip, it will return False so the main function continues. 
+    """
     
     bl_idname = "parent.objects"
     bl_label = "Parent Objects"
+    bl_description = "Parent all objects to their respective parents and apply triangulate if needed."
 
     def execute(self, context):
         os.system('cls')  # Clears the console (Windows only)
@@ -240,22 +296,7 @@ class OBJECT_OT_BodyParent(bpy.types.Operator):
                 print(f"WARNING: {object.name} caused an unknown issue.")
                                  
         return {'FINISHED'}
-    
-    def should_skip(self, object: bpy.types.Object) -> bool:        
-        if not isinstance(object, bpy.types.Object):
-            raise TypeError(f"{object.name} must be an Object.")
-        
-        if "stupidtriangle" in object.name:
-            print(f"{object.name} deleted.")
-            object.select_set(True)
-            bpy.ops.object.delete(use_global=True, confirm=True)
-            return True
-        
-        if object.g2_prop_tag or object.name == "scene_root" or "_cap_" in object.name:
-            return True
-        
-        return False
-    
+       
     def get_parent(self, child: bpy.types.Object) -> bpy.types.Object:
         if not isinstance(child, bpy.types.Object):
             raise TypeError(f"{child.name} must be an Object.")
@@ -286,7 +327,7 @@ class OBJECT_OT_BodyParent(bpy.types.Operator):
                 return bpy.data.objects.get(f"{name_parts[0]}_{child.name[-1]}")
         except:
             print(f"WARNING: {child.name} could not be parented, missing parent object?")
-            
+                    
     def set_parent(self, child: bpy.types.Object, parent: bpy.types.Object) -> None:
         if not isinstance(child, bpy.types.Object):
             raise TypeError(f"{child.name} must be an Object.")
@@ -308,7 +349,23 @@ class OBJECT_OT_BodyParent(bpy.types.Operator):
             
         except:
             print("Something went wrong with parenting {child.name} to {parent.name}")
-            
+                       
+    def should_skip(self, object: bpy.types.Object) -> bool:        
+        if not isinstance(object, bpy.types.Object):
+            raise TypeError(f"{object.name} must be an Object.")
+        
+        if "stupidtriangle" in object.name:
+            print(f"{object.name} deleted.")
+            object.select_set(True)
+            bpy.ops.object.delete(use_global=True, confirm=True)
+            return True
+        
+        if object.g2_prop_tag or object.name == "scene_root" or "_cap_" in object.name:
+            return True
+        
+        return False
+    
+    
 ################################################################################################
 ##                                                                                            ##
 ##                                  SET CAP PARENTING                                         ##
@@ -316,10 +373,27 @@ class OBJECT_OT_BodyParent(bpy.types.Operator):
 ################################################################################################
 
 class OBJECT_OT_CapParent(bpy.types.Operator):
-    """ Parent all caps to their respective body parts """
+    """ 
+    A class that parents all caps to their respective parents. (it will ignore some if the parent is not found).
+    Also, it will check if the caps have non-triangulated faces and apply triangulate if needed.
+    
+    ---------
+    Methods:
+    ---------
+    get_parent(self, object)
+        This takes an object and does a simple algorithm to find a suitable parent.
+    
+    set_parent(self, child, parent)
+        This takes the child and parent (found with get_parent) object and does the actual parenting.
+        
+    should_skip(self, object)
+        This runs a check if it is a stupidtriangle or a specific reason to skip the current object.
+        If none of these have a reason to skip, it will return False so the main function continues. 
+    """
     
     bl_idname = "parent.caps"
     bl_label = "Parent Caps"
+    bl_description = "Parent all caps to their respective parents and apply triangulate if needed."
     
     def execute(self, context):
         os.system('cls')  # Clears the console (Windows only)
@@ -343,22 +417,7 @@ class OBJECT_OT_CapParent(bpy.types.Operator):
                 print(f"WARNING: unknown issue occured with {object.name}")
                                      
         return {'FINISHED'}
-    
-    def should_skip(self, object: bpy.types.Object) -> bool:        
-        if not isinstance(object, bpy.types.Object):
-            raise TypeError(f"{object.name} must be an Object.")
-        
-        if "stupidtriangle" in object.name:
-            print(f"{object.name} deleted.")
-            object.select_set(True)
-            bpy.ops.object.delete(use_global=True, confirm=True)
-            return True
-        
-        if "_cap_" not in object.name or object.g2_prop_tag:
-            return True
-        
-        return False
-    
+      
     def get_parent(self, child: bpy.types.Object) -> bpy.types.Object:
         if not isinstance(child, bpy.types.Object):
             raise TypeError(f"{child.name} must be an Object.")
@@ -391,6 +450,41 @@ class OBJECT_OT_CapParent(bpy.types.Operator):
         except:
             print("Something went wrong with parenting {child.name} to {parent.name}")
 
+    def should_skip(self, object: bpy.types.Object) -> bool:        
+        if not isinstance(object, bpy.types.Object):
+            raise TypeError(f"{object.name} must be an Object.")
+        
+        if "stupidtriangle" in object.name:
+            print(f"{object.name} deleted.")
+            object.select_set(True)
+            bpy.ops.object.delete(use_global=True, confirm=True)
+            return True
+        
+        if "_cap_" not in object.name or object.g2_prop_tag:
+            return True
+        
+        return False
+
+
+################################################################################################
+##                                                                                            ##
+##                                  SET ALL PARENTING                                         ##
+##                                                                                            ##
+################################################################################################
+
+class OBJECT_OT_AllParent(bpy.types.Operator):
+    
+    bl_idname = "parent.all"
+    bl_label = "Parent All"
+    bl_description = "Parent everything at once."
+
+    def execute(self, context):
+        bpy.ops.parent.objects()
+        bpy.ops.parent.tags()
+        bpy.ops.parent.caps()
+        return {'FINISHED'}  
+    
+    
 ################################################################################################
 ##                                                                                            ##
 ##                                  SET G2 PROPERTIES                                         ##
@@ -404,10 +498,21 @@ class OBJECT_OT_SetG2Properties(bpy.types.Operator):
     
     If you want to set a custom shader, change g2_prop_shader after using this function or it will be
     overwritten by emptiness.
+    
+    ---------
+    Methods:
+    ---------
+    set_g2_properties(self, object)
+        This takes an object and sets any Ghoul2 property to what it should be.
+        
+    should_skip(self, object)
+        This runs a check if it is a stupidtriangle or a specific reason to skip the current object.
+        If none of these have a reason to skip, it will return False so the main function continues. 
     """
     
     bl_idname = "set.g2properties"
     bl_label = "Set G2 Properties"
+    bl_description = "Set all Ghoul2 properties"
 
     def execute(self, context):
         os.system('cls')
@@ -420,22 +525,6 @@ class OBJECT_OT_SetG2Properties(bpy.types.Operator):
             self.set_g2_properties(object)
                                      
         return {'FINISHED'}
-
-    def should_skip(self, object: bpy.types.Object) -> bool:        
-        if not isinstance(object, bpy.types.Object):
-            raise TypeError(f"{object.name} must be an Object.")
-        
-        if "stupidtriangle" in object.name:
-            print(f"{object.name} deleted.")
-            object.select_set(True)
-            bpy.ops.object.delete(use_global=True, confirm=True)
-            return True
-        
-        if "root" in object.name:
-            return True
-        
-        return False
-
 
     def set_g2_properties(self, object: bpy.types.Object) -> None:
         if not isinstance(object, bpy.types.Object):
@@ -456,6 +545,22 @@ class OBJECT_OT_SetG2Properties(bpy.types.Operator):
             object.g2_prop_off = False
             object.g2_prop_tag = False
         
+    def should_skip(self, object: bpy.types.Object) -> bool:        
+        if not isinstance(object, bpy.types.Object):
+            raise TypeError(f"{object.name} must be an Object.")
+        
+        if "stupidtriangle" in object.name:
+            print(f"{object.name} deleted.")
+            object.select_set(True)
+            bpy.ops.object.delete(use_global=True, confirm=True)
+            return True
+        
+        if "root" in object.name:
+            return True
+        
+        return False
+    
+    
 ################################################################################################
 ##                                                                                            ##
 ##                               REMOVE ALL PARENTING                                         ##
@@ -475,7 +580,6 @@ class OBJECT_OT_UnparentAll(bpy.types.Operator):
             matrixcopy = object.matrix_world.copy()
             object.parent = None 
             object.matrix_world = matrixcopy
-
         
         return {'FINISHED'} 
     
@@ -681,6 +785,7 @@ class OBJECT_OT_SetArmature(bpy.types.Operator):
     
     bl_idname = "set.armaturemod"
     bl_label = "Set Armature Modifier"
+    bl_description = "Setup an armature modifier with skeleton_root"
     
     def execute(self, context): 
         os.system('cls')
@@ -723,8 +828,7 @@ class OBJECT_OT_SetArmature(bpy.types.Operator):
     
 class OBJECT_OT_RemoveEmptyVertexGroups(bpy.types.Operator):
     """
-    This class will check every object for empty vertex groups. I like my objects clean, hence why I made
-    it.
+    This class will check every object for empty vertex groups.
     """
     
     bl_idname = "remove.emptyvgroups"
@@ -745,21 +849,6 @@ class OBJECT_OT_RemoveEmptyVertexGroups(bpy.types.Operator):
     
         return {'FINISHED'}
     
-    def should_skip(self, object: bpy.types.Object) -> bool:        
-        if not isinstance(object, bpy.types.Object):
-            raise TypeError(f"{object.name} must be an Object.")
-        
-        if "stupidtriangle" in object.name:
-            print(f"{object.name} deleted.")
-            object.select_set(True)
-            bpy.ops.object.delete(use_global=True, confirm=True)
-            return True
-        
-        if object.type != 'MESH' or "root" in object.name:
-            return True
-        
-        return False       
-
     def remove_vertex_groups(self, object: bpy.types.Object) -> None:
         if not isinstance(object, bpy.types.Object):
             raise TypeError(f"{object.name} must be an Object.")
@@ -789,6 +878,20 @@ class OBJECT_OT_RemoveEmptyVertexGroups(bpy.types.Operator):
         for vgroup in vertex_groups_to_remove:
             object.vertex_groups.remove(vgroup)
 
+    def should_skip(self, object: bpy.types.Object) -> bool:        
+        if not isinstance(object, bpy.types.Object):
+            raise TypeError(f"{object.name} must be an Object.")
+        
+        if "stupidtriangle" in object.name:
+            print(f"{object.name} deleted.")
+            object.select_set(True)
+            bpy.ops.object.delete(use_global=True, confirm=True)
+            return True
+        
+        if object.type != 'MESH' or "root" in object.name:
+            return True
+        
+        return False       
 
 ################################################################################################
 ##                                                                                            ##
@@ -818,9 +921,9 @@ class OBJECT_OT_CreateRoot(bpy.types.Operator):
 
         # Deselect everything
         bpy.ops.object.select_all(action='DESELECT')
-
-            
+  
         return {'FINISHED'}  
+
     
 ################################################################################################
 ##                                                                                            ##
@@ -847,7 +950,74 @@ class OBJECT_OT_OrigintoGeometry(bpy.types.Operator):
         print("Origin to Geometry set on all objects.")
         
         return {'FINISHED'} 
+
+class OBJECT_OT_ReplaceObject(bpy.types.Operator):
+    """
+    This class will assist your kitbashing even further. Instead of unparenting everything, you can now
+    define object 1 (object to replace) and object 2 (object to replace object 1 with).
     
+    It will rename object 2 to the name of object 1, it will also parent object 2 to the parent of
+    object 1. Then it will see what children object 1 has and parent those to object 2.
+    
+    ------
+    METHODS:
+    ------
+        
+        copy_parenting(self, object1, object2):
+            This will copy every parent-child relations of object1 to object2
+    """
+    
+    bl_idname = "object.replace_object"
+    bl_label = "Replace Object"
+    bl_description = "Replace Object 1 with Object 2 (Rename & Take over child-parent relations)"
+
+    def execute(self, context):
+        props = context.scene.settings
+        object1_name = props.object1
+        object2_name = props.object2
+
+        if object1_name == "" or object2_name == "":
+            self.report({'ERROR'}, "Please select both objects")
+            return {'CANCELLED'}
+
+        if object1_name == object2_name:
+            self.report({'ERROR'}, "Cannot replace an object with itself")
+            return {'CANCELLED'}
+
+        object1 = bpy.data.objects[object1_name]
+        object2 = bpy.data.objects[object2_name]
+
+        if not object1 or not object2:
+            self.report({'ERROR'}, "Objects not found")
+            return {'CANCELLED'}
+
+        self.copy_parenting(object1, object2)
+
+        # Perform replacement: give obj2 the name of obj1
+        old_name = object1.name
+        bpy.data.objects.remove(object1)  # delete Object 1
+        object2.name = old_name           # rename Object 2
+
+        self.report({'INFO'}, f"Replaced {object1_name} with {object2_name}")
+        return {'FINISHED'}  
+    
+    def copy_parenting(self, object1: bpy.types.Object, object2: bpy.types.Object) -> None:        
+        if not isinstance(object1, bpy.types.Object):
+            raise TypeError(f"{object1.name} must be an Object.")
+        if not isinstance(object2, bpy.types.Object):
+            raise TypeError(f"{object2.name} must be an Object.")
+    
+        # Give object2 the same parent as object1
+        object2.parent = object1.parent
+        object2.matrix_parent_inverse = object1.matrix_parent_inverse.copy()
+
+        # Reparent all children of object1 to object2
+        for child in object1.children:
+            child.parent = object2
+            child.matrix_parent_inverse = object2.matrix_world.inverted() @ child.matrix_world
+
+        print(f"Copied parenting from {object1.name} to {object2.name}")
+        
 def triangulate(object: bpy.types.Object) -> None:
     if not isinstance(object, bpy.types.Object):
         raise TypeError(f"{object.name} must be an Object.")
@@ -864,33 +1034,30 @@ def triangulate(object: bpy.types.Object) -> None:
         # Apply the modifier
         bpy.context.view_layer.objects.active = object
         bpy.ops.object.modifier_apply(modifier="Triangulate") 
+        
+
+classes = [
+    OBJECT_OT_ReplaceObject,
+    OBJECT_OT_AllParent,
+    OBJECT_OT_BodyParent,
+    OBJECT_OT_CapParent,
+    OBJECT_OT_TagParent,
+    OBJECT_OT_UnparentAll,
+    OBJECT_OT_SetG2Properties,
+    OBJECT_OT_CreateTags,
+    OBJECT_OT_Clean,
+    OBJECT_OT_CreateSkinFile,
+    OBJECT_OT_SelectObjectType,
+    OBJECT_OT_SetArmature,
+    OBJECT_OT_RemoveEmptyVertexGroups,
+    OBJECT_OT_CreateRoot,
+    OBJECT_OT_OrigintoGeometry,
+]
 
 def register_operators():
-    bpy.utils.register_class(OBJECT_OT_BodyParent)
-    bpy.utils.register_class(OBJECT_OT_CapParent)
-    bpy.utils.register_class(OBJECT_OT_TagParent)
-    bpy.utils.register_class(OBJECT_OT_SetG2Properties)
-    bpy.utils.register_class(OBJECT_OT_CreateSkinFile)
-    bpy.utils.register_class(OBJECT_OT_UnparentAll)
-    bpy.utils.register_class(OBJECT_OT_CreateTags)
-    bpy.utils.register_class(OBJECT_OT_Clean)
-    bpy.utils.register_class(OBJECT_OT_SelectObjectType)
-    bpy.utils.register_class(OBJECT_OT_SetArmature)
-    bpy.utils.register_class(OBJECT_OT_RemoveEmptyVertexGroups)
-    bpy.utils.register_class(OBJECT_OT_CreateRoot)
-    bpy.utils.register_class(OBJECT_OT_OrigintoGeometry)
-    
+    for cls in classes:
+        bpy.utils.register_class(cls)
+
 def unregister_operators():
-    bpy.utils.unregister_class(OBJECT_OT_BodyParent)
-    bpy.utils.unregister_class(OBJECT_OT_CapParent)
-    bpy.utils.unregister_class(OBJECT_OT_TagParent)
-    bpy.utils.unregister_class(OBJECT_OT_SetG2Properties)
-    bpy.utils.unregister_class(OBJECT_OT_CreateSkinFile)
-    bpy.utils.unregister_class(OBJECT_OT_UnparentAll)
-    bpy.utils.unregister_class(OBJECT_OT_CreateTags)
-    bpy.utils.unregister_class(OBJECT_OT_Clean)
-    bpy.utils.unregister_class(OBJECT_OT_SelectObjectType)
-    bpy.utils.unregister_class(OBJECT_OT_SetArmature)
-    bpy.utils.unregister_class(OBJECT_OT_RemoveEmptyVertexGroups)
-    bpy.utils.unregister_class(OBJECT_OT_CreateRoot)
-    bpy.utils.unregister_class(OBJECT_OT_OrigintoGeometry)
+    for cls in reversed(classes):
+        bpy.utils.unregister_class(cls)
