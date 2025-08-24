@@ -1,6 +1,6 @@
 [
     {
-        "name": "*hip_bl_0",
+        "name": "*hip_bl",
         "vertices": [
             [
                 3.2525548934936523,
@@ -43,7 +43,7 @@
         }
     },
     {
-        "name": "*hip_br_0",
+        "name": "*hip_br",
         "vertices": [
             [
                 -4.226980209350586,
@@ -86,7 +86,7 @@
         }
     },
     {
-        "name": "*hip_fl_0",
+        "name": "*hip_fl",
         "vertices": [
             [
                 3.841801881790161,
@@ -129,7 +129,7 @@
         }
     },
     {
-        "name": "*hip_fr_0",
+        "name": "*hip_fr",
         "vertices": [
             [
                 -2.6735196113586426,
@@ -172,7 +172,7 @@
         }
     },
     {
-        "name": "*hip_l_0",
+        "name": "*hip_l",
         "vertices": [
             [
                 4.976723670959473,
@@ -215,7 +215,7 @@
         }
     },
     {
-        "name": "*hip_r_0",
+        "name": "*hip_r",
         "vertices": [
             [
                 -4.848601341247559,
@@ -258,7 +258,7 @@
         }
     },
     {
-        "name": "*hips_cap_l_leg_0",
+        "name": "*hips_cap_l_leg",
         "vertices": [
             [
                 8.993215560913086,
@@ -301,7 +301,7 @@
         }
     },
     {
-        "name": "*hips_cap_r_leg_0",
+        "name": "*hips_cap_r_leg",
         "vertices": [
             [
                 -7.7889580726623535,
@@ -344,7 +344,7 @@
         }
     },
     {
-        "name": "*hips_cap_torso_0",
+        "name": "*hips_cap_torso",
         "vertices": [
             [
                 0.6046625971794128,
@@ -387,7 +387,7 @@
         }
     },
     {
-        "name": "*hips_l_knee_0",
+        "name": "*hips_l_knee",
         "vertices": [
             [
                 7.806973457336426,
@@ -430,7 +430,7 @@
         }
     },
     {
-        "name": "*hips_r_knee_0",
+        "name": "*hips_r_knee",
         "vertices": [
             [
                 -6.5487380027771,
@@ -473,7 +473,7 @@
         }
     },
     {
-        "name": "*l_leg_calf_0",
+        "name": "*l_leg_calf",
         "vertices": [
             [
                 10.027791976928711,
@@ -516,7 +516,7 @@
         }
     },
     {
-        "name": "*l_leg_cap_hips_0",
+        "name": "*l_leg_cap_hips",
         "vertices": [
             [
                 7.7469353675842285,
@@ -559,7 +559,7 @@
         }
     },
     {
-        "name": "*l_leg_foot_0",
+        "name": "*l_leg_foot",
         "vertices": [
             [
                 12.792181015014648,
@@ -602,7 +602,7 @@
         }
     },
     {
-        "name": "*r_leg_calf_0",
+        "name": "*r_leg_calf",
         "vertices": [
             [
                 -10.183372497558594,
@@ -645,7 +645,7 @@
         }
     },
     {
-        "name": "*r_leg_cap_hips_0",
+        "name": "*r_leg_cap_hips",
         "vertices": [
             [
                 -8.774896621704102,
@@ -688,7 +688,7 @@
         }
     },
     {
-        "name": "*r_leg_foot_0",
+        "name": "*r_leg_foot",
         "vertices": [
             [
                 -11.623305320739746,
@@ -731,7 +731,7 @@
         }
     },
     {
-        "name": "*back_0",
+        "name": "*back",
         "vertices": [
             [
                 -0.5689033269882202,
@@ -774,7 +774,7 @@
         }
     },
     {
-        "name": "*chestg_0",
+        "name": "*chestg",
         "vertices": [
             [
                 0.6505996584892273,
@@ -817,7 +817,7 @@
         }
     },
     {
-        "name": "*lchest_l_0",
+        "name": "*lchest_l",
         "vertices": [
             [
                 3.2011594772338867,
@@ -860,7 +860,7 @@
         }
     },
     {
-        "name": "*lchest_r_0",
+        "name": "*lchest_r",
         "vertices": [
             [
                 -1.9780378341674805,
@@ -903,7 +903,7 @@
         }
     },
     {
-        "name": "*shldr_l_0",
+        "name": "*shldr_l",
         "vertices": [
             [
                 6.432786464691162,
@@ -946,7 +946,7 @@
         }
     },
     {
-        "name": "*shldr_r_0",
+        "name": "*shldr_r",
         "vertices": [
             [
                 -5.55540657043457,
@@ -989,7 +989,7 @@
         }
     },
     {
-        "name": "*torso_cap_head_0",
+        "name": "*torso_cap_head",
         "vertices": [
             [
                 0.650601327419281,
@@ -1032,7 +1032,7 @@
         }
     },
     {
-        "name": "*torso_cap_hips_0",
+        "name": "*torso_cap_hips",
         "vertices": [
             [
                 -0.5689033269882202,
@@ -1075,7 +1075,7 @@
         }
     },
     {
-        "name": "*torso_cap_l_arm_0",
+        "name": "*torso_cap_l_arm",
         "vertices": [
             [
                 7.73758602142334,
@@ -1118,7 +1118,7 @@
         }
     },
     {
-        "name": "*torso_cap_r_arm_0",
+        "name": "*torso_cap_r_arm",
         "vertices": [
             [
                 -7.665032386779785,
@@ -1161,7 +1161,7 @@
         }
     },
     {
-        "name": "*uchest_l_0",
+        "name": "*uchest_l",
         "vertices": [
             [
                 3.7566521167755127,
@@ -1204,7 +1204,7 @@
         }
     },
     {
-        "name": "*uchest_r_0",
+        "name": "*uchest_r",
         "vertices": [
             [
                 -2.4969537258148193,
@@ -1247,7 +1247,7 @@
         }
     },
     {
-        "name": "*head_back_0",
+        "name": "*head_back",
         "vertices": [
             [
                 -0.5689026713371277,
@@ -1290,7 +1290,7 @@
         }
     },
     {
-        "name": "*head_cap_torso_0",
+        "name": "*head_cap_torso",
         "vertices": [
             [
                 -0.5689026713371277,
@@ -1333,7 +1333,7 @@
         }
     },
     {
-        "name": "*head_eyes_0",
+        "name": "*head_eyes",
         "vertices": [
             [
                 0.650601327419281,
@@ -1376,7 +1376,7 @@
         }
     },
     {
-        "name": "*head_front_0",
+        "name": "*head_front",
         "vertices": [
             [
                 0.6506024599075317,
@@ -1419,7 +1419,7 @@
         }
     },
     {
-        "name": "*head_left_0",
+        "name": "*head_left",
         "vertices": [
             [
                 3.1068267822265625,
@@ -1462,7 +1462,7 @@
         }
     },
     {
-        "name": "*head_right_0",
+        "name": "*head_right",
         "vertices": [
             [
                 -2.7738757133483887,
@@ -1505,7 +1505,7 @@
         }
     },
     {
-        "name": "*head_top_0",
+        "name": "*head_top",
         "vertices": [
             [
                 0.650601327419281,
@@ -1548,7 +1548,7 @@
         }
     },
     {
-        "name": "*l_arm_cap_l_hand_0",
+        "name": "*l_arm_cap_l_hand",
         "vertices": [
             [
                 18.660137176513672,
@@ -1591,7 +1591,7 @@
         }
     },
     {
-        "name": "*l_arm_cap_torso_0",
+        "name": "*l_arm_cap_torso",
         "vertices": [
             [
                 7.759398460388184,
@@ -1634,7 +1634,7 @@
         }
     },
     {
-        "name": "*l_arm_elbow_0",
+        "name": "*l_arm_elbow",
         "vertices": [
             [
                 12.801617622375488,
@@ -1677,7 +1677,7 @@
         }
     },
     {
-        "name": "*l_hand_0",
+        "name": "*l_hand",
         "vertices": [
             [
                 20.67422103881836,
@@ -1720,7 +1720,7 @@
         }
     },
     {
-        "name": "*l_hand_cap_l_arm_0",
+        "name": "*l_hand_cap_l_arm",
         "vertices": [
             [
                 18.941017150878906,
@@ -1763,7 +1763,7 @@
         }
     },
     {
-        "name": "*r_hand_0",
+        "name": "*r_hand",
         "vertices": [
             [
                 -19.478330612182617,
@@ -1806,7 +1806,7 @@
         }
     },
     {
-        "name": "*r_hand_cap_r_arm_0",
+        "name": "*r_hand_cap_r_arm",
         "vertices": [
             [
                 -18.941017150878906,
@@ -1849,7 +1849,7 @@
         }
     },
     {
-        "name": "*r_arm_cap_r_hand_0",
+        "name": "*r_arm_cap_r_hand",
         "vertices": [
             [
                 -18.582012176513672,
@@ -1892,7 +1892,7 @@
         }
     },
     {
-        "name": "*r_arm_cap_torso_0",
+        "name": "*r_arm_cap_torso",
         "vertices": [
             [
                 -7.680337905883789,
@@ -1935,7 +1935,7 @@
         }
     },
     {
-        "name": "*r_arm_elbow_0",
+        "name": "*r_arm_elbow",
         "vertices": [
             [
                 -13.695631980895996,

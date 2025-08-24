@@ -25,20 +25,9 @@ parents_dict = {
 
 class OBJECT_OT_CreateTags(bpy.types.Operator):
     """
-        A class that uses a premade json file to create the original tags
-        used by the game. They have multiple functions and are mandatory.
-        
-        ---------
-        Methods:
-        ---------
-        load_mesh_data(self, file_path)
-            This loads the premade json to be passed on to the next method
-        
-        create_mesh_from_data(self, mesh_data)
-            This actually creates the tags using the previous method.
-            It sets the proper scaling and g2_properties.
+    Create all tags for each model_root in the scene, using premade JSON data.
     """
-    
+
     bl_idname = "create.tags"
     bl_label = "Create Tags"
     bl_description = "Create all tags (if not existing yet)"
@@ -50,36 +39,49 @@ class OBJECT_OT_CreateTags(bpy.types.Operator):
         # Define the JSON file path within the addon directory
         file_path = os.path.join(addon_directory, "tags.json")
 
-        if os.path.exists(file_path):
-            mesh_data_list = self.load_mesh_data(file_path)
-            for mesh_data in mesh_data_list:
-                self.create_mesh_from_data(mesh_data)  # Call with self
-            self.report({'INFO'}, "Tags created with vertex groups and weights.")
-        else:
+        if not os.path.exists(file_path):
             self.report({'ERROR'}, "Tags data file not found.")
+            return {'CANCELLED'}
 
+        # Load JSON data
+        mesh_data_list = self.load_mesh_data(file_path)
+
+        # Find all model_root_X objects
+        model_roots = self.get_all_model_roots()
+
+        if not model_roots:
+            self.report({'WARNING'}, "No model_root objects found.")
+            return {'CANCELLED'}
+
+        for lod in model_roots:
+            for mesh_data in mesh_data_list:
+                self.create_mesh_from_data(mesh_data, lod)
+
+        self.report({'INFO'}, f"Tags created for {len(model_roots)} model_root(s).")
         return {'FINISHED'}
 
     def load_mesh_data(self, file_path):
         """Loads mesh data from a JSON file"""
         with open(file_path, 'r') as f:
-            mesh_data_list = json.load(f)
-            
-        return mesh_data_list
+            return json.load(f)
 
-    def create_mesh_from_data(self, mesh_data):
+    def create_mesh_from_data(self, mesh_data, lod):
         """Creates a mesh from extracted data and assigns vertex groups and weights"""
-        # Check if the object already exists
-        if mesh_data['name'] in bpy.data.objects:
-            self.report({'INFO'}, f"Object '{mesh_data['name']}' already exists, skipping creation.")
-            return bpy.data.objects[mesh_data['name']]
 
-        # Create a new mesh and object if it doesn't exist
-        mesh = bpy.data.meshes.new(mesh_data['name'])
-        object = bpy.data.objects.new(mesh_data['name'], mesh)
+        # Construct unique object name
+        name = f"{mesh_data['name']}_{lod}"
+
+        # Check if the object already exists
+        if name in bpy.data.objects:
+            self.report({'INFO'}, f"Object '{name}' already exists, skipping creation.")
+            return bpy.data.objects[name]
+
+        # Create a new mesh and object
+        mesh = bpy.data.meshes.new(name)
+        obj = bpy.data.objects.new(name, mesh)
 
         # Link the object to the Scene Collection
-        bpy.context.scene.collection.objects.link(object)
+        bpy.context.scene.collection.objects.link(obj)
 
         # Create a BMesh
         bm = bmesh.new()
@@ -102,35 +104,50 @@ class OBJECT_OT_CreateTags(bpy.types.Operator):
         if 'vertex_groups' in mesh_data:
             for group_name, vertices_weights in mesh_data['vertex_groups'].items():
                 # Create the vertex group
-                vertex_group = object.vertex_groups.new(name=group_name)
+                vertex_group = obj.vertex_groups.new(name=group_name)
 
-                # Assign weights to the vertices
+                # Assign weights
                 for vw in vertices_weights:
                     vertex_index = vw['vertex_index']
                     weight = vw['weight']
-                    # Assign the weight to the vertex in the group
                     vertex_group.add([vertex_index], weight, 'REPLACE')
 
         # Scale the object
-        object.scale = (object.scale[0] / 10, object.scale[1] / 10, object.scale[2] / 10)
+        obj.scale = (obj.scale[0] / 10, obj.scale[1] / 10, obj.scale[2] / 10)
 
         # Apply transformations
-        bpy.context.view_layer.objects.active = object
-        object.select_set(True)
+        bpy.context.view_layer.objects.active = obj
+        obj.select_set(True)
         bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
-        object.select_set(False)
+        obj.select_set(False)
 
         # Add Armature modifier
-        object.modifiers.new(name="Armature", type='ARMATURE')
-        object.modifiers["Armature"].object = bpy.data.objects["skeleton_root"]
-        
-        object.g2_prop_name = object.name[:-2]
-        object.g2_prop_shader = ""
-        object.g2_prop_scale = 100.0
-        object.g2_prop_off = False
-        object.g2_prop_tag = True
-        
-        return object
+        obj.modifiers.new(name="Armature", type='ARMATURE')
+        obj.modifiers["Armature"].object = bpy.data.objects["skeleton_root"]
+
+        # Add custom g2 properties
+        obj.g2_prop_name = mesh_data['name']
+        obj.g2_prop_shader = ""
+        obj.g2_prop_scale = 100.0
+        obj.g2_prop_off = False
+        obj.g2_prop_tag = True
+
+        return obj
+
+    def get_all_model_roots(self):
+        """
+        Finds all objects named like 'model_root_X' and returns their numbers as a sorted list.
+        """
+        pattern = re.compile(r"^model_root_(\d+)$")
+        model_roots = []
+
+        for obj in bpy.data.objects:
+            match = pattern.match(obj.name)
+            if match:
+                model_roots.append(int(match.group(1)))
+
+        return sorted(model_roots)
+
 
 ################################################################################################
 ##                                                                                            ##
@@ -990,7 +1007,7 @@ class OBJECT_OT_ReplaceObject(bpy.types.Operator):
         if not object1 or not object2:
             self.report({'ERROR'}, "Objects not found")
             return {'CANCELLED'}
-
+        
         self.copy_parenting(object1, object2)
 
         # Perform replacement: give obj2 the name of obj1
