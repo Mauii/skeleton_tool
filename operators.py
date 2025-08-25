@@ -992,6 +992,7 @@ class OBJECT_OT_ReplaceObject(bpy.types.Operator):
         props = context.scene.settings
         object1_name = props.object1
         object2_name = props.object2
+        action = props.action
 
         if object1_name == "" or object2_name == "":
             self.report({'ERROR'}, "Please select both objects")
@@ -1008,12 +1009,35 @@ class OBJECT_OT_ReplaceObject(bpy.types.Operator):
             self.report({'ERROR'}, "Objects not found")
             return {'CANCELLED'}
         
-        self.copy_parenting(object1, object2)
+        if action == 'DELETE':
+            self.copy_parenting(object1, object2)
 
-        # Perform replacement: give obj2 the name of obj1
-        old_name = object1.name
-        bpy.data.objects.remove(object1)  # delete Object 1
-        object2.name = old_name           # rename Object 2
+            old_name = object1.name
+            bpy.data.objects.remove(object1)  # delete Object 1
+            object2.name = old_name           # rename Object 2
+
+        elif action == 'UNPARENT':
+            self.copy_parenting(object1, object2)
+            
+            old_name = object1.name
+            print(f"Object 1 old name: {old_name}")
+            print(f"Object 2 old name: {object2.name}")
+            object1.name = f"replaced_{old_name}"
+            object2.name = old_name           # rename Object 2
+            print(f"Object 2 new name: {object2.name}")
+            
+            matrixcopy = object1.matrix_world.copy()
+            object1.parent = None 
+            object1.matrix_world = matrixcopy
+            
+            
+        elif action == 'KEEP':
+            self.copy_parenting(object1, object2)
+            
+            old_name = object1.name
+            object1.name = f"replaced_{old_name}"
+            object2.name = old_name           # rename Object 2
+            
 
         self.report({'INFO'}, f"Replaced {object1_name} with {object2_name}")
         return {'FINISHED'}  

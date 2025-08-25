@@ -13,8 +13,8 @@ class OBJECT_PT_SkeletonTool(bpy.types.Panel):
     def draw(self, context): 
         layout = self.layout
 
-        layout.ui_units_x = 10.0
-        layout.ui_units_y = 10.0
+        layout.ui_units_x = 16.0
+        layout.ui_units_y = 16.0
 
         settings = context.scene.settings
 
@@ -29,9 +29,10 @@ class OBJECT_PT_SkeletonTool(bpy.types.Panel):
         box = layout.box()
         box.label(text="Replace")
         
-        layout.prop(settings, "object1")
-        layout.prop(settings, "object2")
-        layout.operator("object.replace_object", icon="ARROW_LEFTRIGHT")
+        box.prop(settings, "object1")
+        box.prop(settings, "object2")
+        box.prop(settings, "action")
+        box.operator("object.replace_object", icon="ARROW_LEFTRIGHT")
 
         box = layout.box()
         box.label(text="Create")

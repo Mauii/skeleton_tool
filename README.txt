@@ -1,14 +1,8 @@
-			Author: Maui				Addon version: 3.1	  					Blender version: 4.2.1
+Author: Maui
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 INSTALLATION:
 Edit ==> Preferences ==> Addons ==> Install
-The same way as you would do any addon.
-
-====================================================================================================================================================================
-HOW TO USE
-====================================================================================================================================================================
-Video(s) are a WIP
 
 ====================================================================================================================================================================
 NAMING CONVENTION
@@ -18,9 +12,9 @@ NAMING CONVENTION
 
 		 			       head
 		    				 |
-			    l_hand ==> l_arm ==> torso <== r_arm <== r_hand
+	 l_hand ==> l_arm ==> torso <== r_arm <== r_hand
 		   			         |
-	 			      l_leg ==> hips <== r_leg
+	 			 l_leg ==> hips <== r_leg
 
 If you have armor or other accessories for your bodyparts, you should name it like this: 
 head_helmet_x (x: LOD level)
