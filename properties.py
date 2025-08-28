@@ -28,6 +28,14 @@ class AddonProperties(bpy.types.PropertyGroup):
     ],
     default='DELETE',
     )
+    
+   # Collapsible toggles
+    show_parenting : BoolProperty(default=True)
+    show_replace : BoolProperty(default=True)
+    show_create : BoolProperty(default=True)
+    show_set : BoolProperty(default=True)
+    show_cleanup : BoolProperty(default=True)
+    show_select : BoolProperty(default=True)
 
 def register_properties():
     bpy.utils.register_class(AddonProperties)

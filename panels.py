@@ -10,54 +10,56 @@ class OBJECT_PT_SkeletonTool(bpy.types.Panel):
     bl_category = "Skeleton tool"
     bl_options = {'DEFAULT_CLOSED'}
     
-    def draw(self, context): 
+    def draw(self, context):
         layout = self.layout
-
-        layout.ui_units_x = 16.0
-        layout.ui_units_y = 16.0
-
         settings = context.scene.settings
 
-        box = layout.box()
-        box.label(text="Parenting")
-        box.operator("parent.all")
-        box.operator("parent.objects")
-        box.operator("parent.tags")
-        box.operator("parent.caps")
-        box.operator("remove.parent")
+        # Helper for collapsible boxes
+        def draw_box(label, toggle_prop, draw_content):
+            row = layout.row()
+            row.prop(settings, toggle_prop, text=label, icon="REMOVE" if getattr(settings, toggle_prop) else "PLUS", emboss=False)
+            if getattr(settings, toggle_prop):
+                box = layout.box()
+                draw_content(box)
 
-        box = layout.box()
-        box.label(text="Replace")
-        
-        box.prop(settings, "object1")
-        box.prop(settings, "object2")
-        box.prop(settings, "action")
-        box.operator("object.replace_object", icon="ARROW_LEFTRIGHT")
+        draw_box("Parenting", "show_parenting", lambda box: [
+            box.operator("parent.all"),
+            box.operator("parent.objects"),
+            box.operator("parent.tags"),
+            box.operator("parent.caps"),
+            box.operator("remove.parent")
+        ])
 
-        box = layout.box()
-        box.label(text="Create")
+        draw_box("Replace", "show_replace", lambda box: [
+            box.prop(settings, "object1"),
+            box.prop(settings, "object2"),
+            box.prop(settings, "action"),
+            box.operator("object.replace_object", icon="ARROW_LEFTRIGHT")
+        ])
 
-        box.operator("create.tags")
-        box.operator("create.root")
-        box.operator("create.skinfile")
+        draw_box("Create", "show_create", lambda box: [
+            box.operator("create.tags"),
+            box.operator("create.root"),
+            box.operator("create.skinfile")
+        ])
 
-        box = layout.box()
-        box.label(text="Set")
-        box.operator("set.armaturemod")
-        box.operator("set.g2properties")
-        box.operator("origin.geometry")
+        draw_box("Set", "show_set", lambda box: [
+            box.operator("set.armaturemod"),
+            box.operator("set.g2properties"),
+            box.operator("origin.geometry")
+        ])
 
-        box = layout.box()
-        box.label(text="Cleanup")
-        box.operator("remove.emptyvgroups")
-        box.operator("clean.hierarchy")
+        draw_box("Cleanup", "show_cleanup", lambda box: [
+            box.operator("remove.emptyvgroups"),
+            box.operator("clean.hierarchy")
+        ])
 
-        box = layout.box()
-        box.label(text="Select")
-        box.operator("select.object_type")
-        box.prop(settings, "meshes")
-        box.prop(settings, "caps")
-        box.prop(settings, "tags")
+        draw_box("Select", "show_select", lambda box: [
+            box.operator("select.object_type"),
+            box.prop(settings, "meshes"),
+            box.prop(settings, "caps"),
+            box.prop(settings, "tags")
+        ])
 
 def register_panels():
     bpy.utils.register_class(OBJECT_PT_SkeletonTool)

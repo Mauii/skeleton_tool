@@ -59,7 +59,7 @@ class OBJECT_OT_CreateTags(bpy.types.Operator):
 
         self.report({'INFO'}, f"Tags created for {len(model_roots)} model_root(s).")
         return {'FINISHED'}
-
+    
     def load_mesh_data(self, file_path):
         """Loads mesh data from a JSON file"""
         with open(file_path, 'r') as f:
@@ -78,10 +78,10 @@ class OBJECT_OT_CreateTags(bpy.types.Operator):
 
         # Create a new mesh and object
         mesh = bpy.data.meshes.new(name)
-        obj = bpy.data.objects.new(name, mesh)
+        object = bpy.data.objects.new(name, mesh)
 
         # Link the object to the Scene Collection
-        bpy.context.scene.collection.objects.link(obj)
+        bpy.context.scene.collection.objects.link(object)
 
         # Create a BMesh
         bm = bmesh.new()
@@ -104,7 +104,7 @@ class OBJECT_OT_CreateTags(bpy.types.Operator):
         if 'vertex_groups' in mesh_data:
             for group_name, vertices_weights in mesh_data['vertex_groups'].items():
                 # Create the vertex group
-                vertex_group = obj.vertex_groups.new(name=group_name)
+                vertex_group = object.vertex_groups.new(name=group_name)
 
                 # Assign weights
                 for vw in vertices_weights:
@@ -113,26 +113,29 @@ class OBJECT_OT_CreateTags(bpy.types.Operator):
                     vertex_group.add([vertex_index], weight, 'REPLACE')
 
         # Scale the object
-        obj.scale = (obj.scale[0] / 10, obj.scale[1] / 10, obj.scale[2] / 10)
+        object.scale = (object.scale[0] / 10, object.scale[1] / 10, object.scale[2] / 10)
 
         # Apply transformations
-        bpy.context.view_layer.objects.active = obj
-        obj.select_set(True)
+        bpy.context.view_layer.objects.active = object
+        object.select_set(True)
         bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
-        obj.select_set(False)
-
-        # Add Armature modifier
-        obj.modifiers.new(name="Armature", type='ARMATURE')
-        obj.modifiers["Armature"].object = bpy.data.objects["skeleton_root"]
+        object.select_set(False)
+        
+        try:
+            # Add Armature modifier
+            object.modifiers.new(name="Armature", type='ARMATURE')
+            object.modifiers["Armature"].object = bpy.data.objects["skeleton_root"]
+        except:
+            print(f"WARNING: 'skeleton_root' not found, cannot assign to {object.name}")
 
         # Add custom g2 properties
-        obj.g2_prop_name = mesh_data['name']
-        obj.g2_prop_shader = ""
-        obj.g2_prop_scale = 100.0
-        obj.g2_prop_off = False
-        obj.g2_prop_tag = True
-
-        return obj
+        object.g2_prop_name = mesh_data['name']
+        object.g2_prop_shader = ""
+        object.g2_prop_scale = 100.0
+        object.g2_prop_off = False
+        object.g2_prop_tag = True
+        
+        return object
 
     def get_all_model_roots(self):
         """
