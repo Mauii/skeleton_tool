@@ -706,18 +706,18 @@ class OBJECT_OT_CreateSkinFile(bpy.types.Operator):
     def get_image(self, object) -> str:
         if object.active_material:
             material = object.active_material
-            
+            print("1")
             # Check if the material uses nodes
             if material.use_nodes:
                 # Get the node tree of the material
                 nodes = material.node_tree.nodes
-                
+                print("2")
                 # Find the Principled BSDF node
                 for node in nodes:
                     if node.type == 'BSDF_PRINCIPLED':
                         # Check if Base Color is linked
                         base_color_input = node.inputs['Base Color']
-                        
+                        print("3")
                         if base_color_input.is_linked:
                             # Get the node linked to Base Color
                             linked_node = base_color_input.links[0].from_node
@@ -729,9 +729,12 @@ class OBJECT_OT_CreateSkinFile(bpy.types.Operator):
                                 print("Base Color is not linked to an image texture.")
                         else:
                             print("Base Color is not linked.")
-                        break
-                else:
-                    print("Principled BSDF node not found.")
+                            return "unknown"
+                    else:
+                        print("Principled BSDF node not found.")
+                        return "unknown"
+            else:
+                return "unknown"
         else:
             return object.active_material.name.split("/")[-1][:-4]
         return image.name[:-4]
@@ -780,12 +783,6 @@ class OBJECT_OT_SelectObjectType(bpy.types.Operator):
     def should_skip(self, object: bpy.types.Object) -> bool:        
         if not isinstance(object, bpy.types.Object):
             raise TypeError(f"{object.name} must be an Object.")
-        
-        if "stupidtriangle" in object.name:
-            print(f"{object.name} deleted.")
-            object.select_set(True)
-            bpy.ops.object.delete(use_global=True, confirm=True)
-            return True
         
         if object.type != 'MESH':
             return True
