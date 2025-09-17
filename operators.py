@@ -17,6 +17,73 @@ parents_dict = {
     "r_leg": "hips"
 }
 
+
+# Global lookup dictionary
+obj_lookup = {}
+
+def initialize_lookup():
+    """Initialize the object lookup safely."""
+    global obj_lookup
+    try:
+        obj_lookup = {o.name: o for o in bpy.data.objects}
+    except AttributeError:
+        # bpy.data is restricted (e.g., during reload)
+        obj_lookup = {}
+
+def refresh_lookup(scene=None):
+    """Detect added, removed, and renamed objects, storing objects in obj_lookup."""
+    global obj_lookup
+    try:
+        current_objects = bpy.data.objects
+    except AttributeError:
+        return
+
+    current_names = {o.name for o in current_objects}
+    previous_names = set(obj_lookup.keys())
+
+    # Added objects
+    added = current_names - previous_names
+    if added:
+        print("Added objects:", added)
+
+    # Removed objects
+    removed = previous_names - current_names
+    if removed:
+        print("Removed objects:", removed)
+
+    # Renamed objects
+    renamed = []
+    for prev_name, prev_obj in list(obj_lookup.items()):
+        try:
+            if prev_name not in current_names and prev_obj.name in current_names:
+                renamed.append((prev_name, prev_obj.name))
+        except ReferenceError:
+            # Object was deleted, skip
+            continue
+    if renamed:
+        print("Renamed objects:", renamed)
+
+    # Update lookup: store the objects themselves
+    obj_lookup.clear()
+    for obj in current_objects:
+        obj_lookup[obj.name] = obj
+
+def register_handler():
+    """Register the depsgraph handler safely."""
+    if refresh_lookup not in bpy.app.handlers.depsgraph_update_post:
+        bpy.app.handlers.depsgraph_update_post.append(refresh_lookup)
+
+def unregister_handler():
+    """Unregister the depsgraph handler."""
+    if refresh_lookup in bpy.app.handlers.depsgraph_update_post:
+        bpy.app.handlers.depsgraph_update_post.remove(refresh_lookup)
+
+# Initialize and register
+initialize_lookup()
+register_handler()
+
+
+
 ################################################################################################
 ##                                                                                            ##
 ##                                        CREATE TAGS                                         ##
@@ -144,7 +211,7 @@ class OBJECT_OT_CreateTags(bpy.types.Operator):
         pattern = re.compile(r"^model_root_(\d+)$")
         model_roots = []
 
-        for obj in bpy.data.objects:
+        for obj in obj_lookup:
             match = pattern.match(obj.name)
             if match:
                 model_roots.append(int(match.group(1)))
@@ -181,7 +248,9 @@ class OBJECT_OT_TagParent(bpy.types.Operator):
     bl_description = "Parent all tags to their respective parents."
 
     def execute(self, context):
-        for object in bpy.data.objects:
+        for object in obj_lookup.values(): # Runs this for loop until all tags are parented, non-tags are skipped.
+            
+            self.check_object(object)
             
             if self.should_skip(object):
                 continue
@@ -254,19 +323,18 @@ class OBJECT_OT_TagParent(bpy.types.Operator):
             
     def should_skip(self, object: bpy.types.Object) -> bool:        
         if not isinstance(object, bpy.types.Object):
-            raise TypeError(f"{object.name} must be an Object.")
-        
-        if "stupidtriangle" in object.name:
-            print(f"{object.name} deleted.")
-            object.select_set(True)
-            bpy.ops.object.delete(use_global=True, confirm=True)
-            return True
+            raise TypeError(f"{object.name} must be an Object.")            
         
         if not object.g2_prop_tag:
             return True
         
         return False
 
+    def check_object(self, object: bpy.types.Object) -> None: 
+        if not isinstance(object, bpy.types.Object):
+            raise TypeError(f"{object.name} must be an Object.")
+        
+        SetG2Properties.set_g2_properties(self, object)        
 
 ################################################################################################
 ##                                                                                            ##
@@ -300,7 +368,7 @@ class OBJECT_OT_BodyParent(bpy.types.Operator):
     def execute(self, context):
         os.system('cls')  # Clears the console (Windows only)
 
-        for object in bpy.data.objects:
+        for object in obj_lookup.values():
             if self.should_skip(object):
                 continue
             
@@ -418,7 +486,7 @@ class OBJECT_OT_CapParent(bpy.types.Operator):
     def execute(self, context):
         os.system('cls')  # Clears the console (Windows only)
 
-        for object in bpy.data.objects:
+        for object in obj_lookup.values():
             try:
                 if self.should_skip(object):
                     continue
@@ -511,7 +579,7 @@ class OBJECT_OT_AllParent(bpy.types.Operator):
 ##                                                                                            ##
 ################################################################################################
     
-class OBJECT_OT_SetG2Properties(bpy.types.Operator):
+class SetG2Properties(bpy.types.Operator):
     """
     This class makes sure to set all g2_properties for all objects within the scene. This is needed for
     JKA to be able to run this model at all. Even modview needs it.
@@ -537,7 +605,7 @@ class OBJECT_OT_SetG2Properties(bpy.types.Operator):
     def execute(self, context):
         os.system('cls')
         
-        for object in bpy.data.objects:
+        for object in obj_lookup.values():
             
             if self.should_skip(object):
                 continue
@@ -551,8 +619,8 @@ class OBJECT_OT_SetG2Properties(bpy.types.Operator):
             raise TypeError(f"{object.name} must be an Object.")
 
         object.g2_prop_name = object.name[:-2]
-        object.g2_prop_shader = ""
-        object.g2_prop_scale = 100.0
+        object.g2_prop_shader = "" # Set this manually if need be
+        object.g2_prop_scale = 100.0 
                     
         if "_off" in object.name[:-2]:
             object.g2_prop_off = True
@@ -569,13 +637,7 @@ class OBJECT_OT_SetG2Properties(bpy.types.Operator):
         if not isinstance(object, bpy.types.Object):
             raise TypeError(f"{object.name} must be an Object.")
         
-        if "stupidtriangle" in object.name:
-            print(f"{object.name} deleted.")
-            object.select_set(True)
-            bpy.ops.object.delete(use_global=True, confirm=True)
-            return True
-        
-        if "root" in object.name:
+        if object.type != 'MESH':
             return True
         
         return False
@@ -596,7 +658,7 @@ class OBJECT_OT_UnparentAll(bpy.types.Operator):
     def execute(self, context):
         os.system('cls')
         
-        for object in bpy.data.objects:
+        for object in obj_lookup.values():
             matrixcopy = object.matrix_world.copy()
             object.parent = None 
             object.matrix_world = matrixcopy
@@ -618,7 +680,7 @@ class OBJECT_OT_Clean(bpy.types.Operator):
     def execute(self, context): 
         os.system('cls')
         
-        for object in bpy.data.objects:   
+        for object in obj_lookup.values():   
                   
             if ".00" in object.name:
                 object.select_set(True)
@@ -675,7 +737,7 @@ class OBJECT_OT_CreateSkinFile(bpy.types.Operator):
                 caps = ""
                 roots = ("skeleton_root", "model_root", "scene_root")
 
-                for object in bpy.data.objects:
+                for object in obj_lookup.values():
                     # Skip model_root, scene_root and skeleton_root, tags and objects without an active_material set.
                     if object.type != "MESH" or object.g2_prop_tag or any(root in object.name for root in roots):
                         continue
@@ -759,7 +821,7 @@ class OBJECT_OT_SelectObjectType(bpy.types.Operator):
         settings = bpy.context.scene.settings
         scene_collection = bpy.context.scene.collection
             
-        for object in bpy.data.objects:
+        for object in obj_lookup.values():
             if self.should_skip(object):
                 continue
             
@@ -807,7 +869,7 @@ class OBJECT_OT_SetArmature(bpy.types.Operator):
     def execute(self, context): 
         os.system('cls')
 
-        for object in bpy.data.objects:
+        for object in obj_lookup.values():
         
             if self.should_skip(object):
                 continue
@@ -855,7 +917,7 @@ class OBJECT_OT_RemoveEmptyVertexGroups(bpy.types.Operator):
         os.system('cls')
         
         try:
-            for object in bpy.data.objects:
+            for object in obj_lookup.values():
                 
                 if self.should_skip(object):
                     continue
@@ -1084,7 +1146,7 @@ classes = [
     OBJECT_OT_CapParent,
     OBJECT_OT_TagParent,
     OBJECT_OT_UnparentAll,
-    OBJECT_OT_SetG2Properties,
+    SetG2Properties,
     OBJECT_OT_CreateTags,
     OBJECT_OT_Clean,
     OBJECT_OT_CreateSkinFile,
