@@ -68,6 +68,16 @@ def refresh_lookup(scene=None):
     for obj in current_objects:
         obj_lookup[obj.name] = obj
 
+def iter_live_objects():
+    """Yield live objects from the lookup, skipping entries that have been removed."""
+    refresh_lookup()
+    for obj in list(obj_lookup.values()):
+        try:
+            _ = obj.name
+        except ReferenceError:
+            continue
+        yield obj
+
 def register_handler():
     """Register the depsgraph handler safely."""
     if refresh_lookup not in bpy.app.handlers.depsgraph_update_post:
@@ -83,37 +93,20 @@ initialize_lookup()
 register_handler()
 
 
-
-################################################################################################
-##                                                                                            ##
-##                                        CREATE TAGS                                         ##
-##                                                                                            ##
-################################################################################################
-
 class OBJECT_OT_CreateTags(bpy.types.Operator):
-    """
-    Create all tags for each model_root in the scene, using premade JSON data.
-    """
-
     bl_idname = "create.tags"
     bl_label = "Create Tags"
     bl_description = "Create all tags (if not existing yet)"
 
     def execute(self, context):
-        # Get the current directory of the addon
         addon_directory = os.path.dirname(os.path.realpath(__file__))
-
-        # Define the JSON file path within the addon directory
         file_path = os.path.join(addon_directory, "tags.json")
 
         if not os.path.exists(file_path):
             self.report({'ERROR'}, "Tags data file not found.")
             return {'CANCELLED'}
 
-        # Load JSON data
         mesh_data_list = self.load_mesh_data(file_path)
-
-        # Find all model_root_X objects
         model_roots = self.get_all_model_roots()
 
         if not model_roots:
@@ -128,146 +121,103 @@ class OBJECT_OT_CreateTags(bpy.types.Operator):
         return {'FINISHED'}
     
     def load_mesh_data(self, file_path):
-        """Loads mesh data from a JSON file"""
         with open(file_path, 'r') as f:
             return json.load(f)
 
     def create_mesh_from_data(self, mesh_data, lod):
-        """Creates a mesh from extracted data and assigns vertex groups and weights"""
-
-        # Construct unique object name
         name = f"{mesh_data['name']}_{lod}"
+        if not self.name_unique_check(name):
+            return None
 
-        # Check if the object already exists
-        if name in bpy.data.objects:
-            self.report({'INFO'}, f"Object '{name}' already exists, skipping creation.")
-            return bpy.data.objects[name]
-
-        # Create a new mesh and object
         mesh = bpy.data.meshes.new(name)
-        object = bpy.data.objects.new(name, mesh)
-
-        # Link the object to the Scene Collection
-        bpy.context.scene.collection.objects.link(object)
-
-        # Create a BMesh
-        bm = bmesh.new()
-
-        # Add vertices
-        vertex_map = {}
-        for vert in mesh_data['vertices']:
-            vertex = bm.verts.new(vert)
-            vertex_map[len(vertex_map)] = vertex  # Store the vertex by index
-
-        # Add faces
-        for face in mesh_data['faces']:
-            bm.faces.new([vertex_map[i] for i in face])
-
-        # Finish BMesh and write to the mesh
+        bm = self.create_bmesh_from_mesh(mesh, mesh_data)
         bm.to_mesh(mesh)
         bm.free()
 
-        # Assign vertex groups and weights
+        obj = self.create_object_with_meshdata(name, mesh, mesh_data)
+        self.apply_vertex_groups(obj, mesh_data)
+        self.set_armature_modifier(obj)
+        return obj
+
+    def create_bmesh_from_mesh(self, mesh_data):
+        bm = bmesh.new()
+        vertex_map = {}
+        for vert in mesh_data['vertices']:
+            v = bm.verts.new(vert)
+            vertex_map[len(vertex_map)] = v
+        for face in mesh_data['faces']:
+            bm.faces.new([vertex_map[i] for i in face])
+        return bm
+    
+    def create_object_with_meshdata(self, name, mesh, mesh_data):
+        obj = bpy.data.objects.new(name, mesh)
+        bpy.context.scene.collection.objects.link(obj)
+
+        obj.scale = (obj.scale[0] / 10, obj.scale[1] / 10, obj.scale[2] / 10)
+        obj.data.transform(obj.matrix_world)
+        obj.matrix_world.identity()
+        self.apply_g2_properties(obj, mesh_data)
+        return obj    
+    
+    def apply_g2_properties(self, obj, mesh_data):
+        obj.g2_prop_name = mesh_data['name']
+        obj.g2_prop_shader = ""
+        obj.g2_prop_scale = 100.0
+        obj.g2_prop_off = False
+        obj.g2_prop_tag = True
+
+    def set_armature_modifier(self, obj):
+        armature = bpy.data.objects.get("skeleton_root")
+        if armature:
+            mod = obj.modifiers.new(name="Armature", type='ARMATURE')
+            mod.object = armature
+        else:
+            self.report({'WARNING'}, "No skeleton_root object found.")
+
+
+    def name_unique_check(self, name):
+        if name in bpy.data.objects:
+            self.report({'INFO'}, f"Object '{name}' already exists, skipping creation.")
+            return False
+        return True
+
+    def apply_vertex_groups(self, obj, mesh_data):
         if 'vertex_groups' in mesh_data:
             for group_name, vertices_weights in mesh_data['vertex_groups'].items():
-                # Create the vertex group
-                vertex_group = object.vertex_groups.new(name=group_name)
-
-                # Assign weights
+                vg = obj.vertex_groups.new(name=group_name)
                 for vw in vertices_weights:
-                    vertex_index = vw['vertex_index']
-                    weight = vw['weight']
-                    vertex_group.add([vertex_index], weight, 'REPLACE')
-
-        # Scale the object
-        object.scale = (object.scale[0] / 10, object.scale[1] / 10, object.scale[2] / 10)
-
-        # Apply transformations
-        bpy.context.view_layer.objects.active = object
-        object.select_set(True)
-        bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
-        object.select_set(False)
-        
-        try:
-            # Add Armature modifier
-            object.modifiers.new(name="Armature", type='ARMATURE')
-            object.modifiers["Armature"].object = bpy.data.objects["skeleton_root"]
-        except:
-            print(f"WARNING: 'skeleton_root' not found, cannot assign to {object.name}")
-
-        # Add custom g2 properties
-        object.g2_prop_name = mesh_data['name']
-        object.g2_prop_shader = ""
-        object.g2_prop_scale = 100.0
-        object.g2_prop_off = False
-        object.g2_prop_tag = True
-        
-        return object
+                    vg.add([vw['vertex_index']], vw['weight'], 'REPLACE')
 
     def get_all_model_roots(self):
-        """
-        Finds all objects named like 'model_root_X' and returns their numbers as a sorted list.
-        """
         pattern = re.compile(r"^model_root_(\d+)$")
         model_roots = []
-
-        for obj in obj_lookup:
+        for obj in bpy.data.objects:
             match = pattern.match(obj.name)
             if match:
                 model_roots.append(int(match.group(1)))
-
         return sorted(model_roots)
 
-
-################################################################################################
-##                                                                                            ##
-##                                        PARENT TAGS                                         ##
-##                                                                                            ##
-################################################################################################
-
-class OBJECT_OT_TagParent(bpy.types.Operator):
-    """ 
-    A class that parents all tags to their respective parents. (it will ignore some if the parent is not found).
-    
-    ---------
-    Methods:
-    ---------
-    get_parent(self, object)
-        This takes an object and does a simple algorithm to find a suitable parent.
-    
-    set_parent(self, child, parent)
-        This takes the child and parent (found with get_parent) object and does the actual parenting.
-        
-    should_skip(self, object)
-        This runs a check if it is a stupidtriangle or a specific reason to skip the current object.
-        If none of these have a reason to skip, it will return False so the main function continues. 
-    """
-    
+class OBJECT_OT_TagParent(bpy.types.Operator):  
     bl_idname = "parent.tags"
     bl_label = "Parent Tags"
     bl_description = "Parent all tags to their respective parents."
 
     def execute(self, context):
-        for object in obj_lookup.values(): # Runs this for loop until all tags are parented, non-tags are skipped.
-            
-            self.check_object(object)
-            
-            if self.should_skip(object):
-                continue
-                             
-            parent_name = self.get_parent(object)
-            parent_object = bpy.data.objects.get(parent_name)
-            
+        for object in iter_live_objects():
             try:
-                # Check if the returned 'parent' actually exists
-                if bpy.data.objects.get(parent_name):
-                    self.set_parent(object, parent_object)
-                else:
-                    print(f"Warning: Parent '{parent}' for tag '{object.name}' not found.")
+                self.check_object(object)
                 
-            except:
-                print(f"WARNING: {object.name} caused an unknown issue.")
-        
+                if self.should_skip(object):
+                    continue
+                                 
+                parent_name = self.get_parent(object)
+                parent_object = bpy.data.objects.get(parent_name)
+            
+                if parent_object:
+                    set_parent(object, parent_object)
+            except ReferenceError:
+                continue
+                   
         return {'FINISHED'}
 
     def get_parent(self, object: bpy.types.Object) -> bpy.types.Object:
@@ -287,6 +237,9 @@ class OBJECT_OT_TagParent(bpy.types.Operator):
             if base in 'r':
                 return f"r_{name_parts[1]}_{lod}"
             
+            if base in "hip":
+                return f"torso_{lod}"
+
             # hips check
             if base in "hips":
                 return f"hips_{lod}"
@@ -299,33 +252,13 @@ class OBJECT_OT_TagParent(bpy.types.Operator):
             return f"torso_{lod}"
         except:
             print(f"WARNING: {object.name} caused an unknown problem.")
-        
-    def set_parent(self, child: bpy.types.Object, parent: bpy.types.Object) -> None:
-        if not isinstance(child, bpy.types.Object):
-            raise TypeError(f"{child.name} must be an Object.")
-
-        if not isinstance(parent, bpy.types.Object):
-            raise TypeError(f"{parent.name} must be an Object.")
-        
-        try:
-            # Copy the world matrix
-            matrixcopy = child.matrix_world.copy()
-            
-            # Set the parent
-            child.parent = parent
-            
-            # Restore the world transform
-            child.matrix_world = matrixcopy
-            
-            print(f"{child.name} parented to {parent.name}")
-        except:
-            print(f"WARNING: unknown issue occured while parenting {child.name} to {parent.name}")
             
     def should_skip(self, object: bpy.types.Object) -> bool:        
         if not isinstance(object, bpy.types.Object):
             raise TypeError(f"{object.name} must be an Object.")            
         
-        if not object.g2_prop_tag:
+        # startswith * added as failsafe if tag object didn't get g2 props set 
+        if not object.g2_prop_tag or object.name.startswith("*"):
             return True
         
         return False
@@ -368,21 +301,23 @@ class OBJECT_OT_BodyParent(bpy.types.Operator):
     def execute(self, context):
         os.system('cls')  # Clears the console (Windows only)
 
-        for object in obj_lookup.values():
-            if self.should_skip(object):
-                continue
-            
-            if object.type == 'MESH':
-                triangulate(object)
-            
-            try:    
+        for object in iter_live_objects():
+            try:
+                if self.should_skip(object):
+                    continue
+                
+                if object.type is 'MESH':
+                    triangulate(object)
+                
                 parent_object = self.get_parent(object)
                 
                 if parent_object:
-                    self.set_parent(object, parent_object)
-            except:
-                print(f"WARNING: {object.name} caused an unknown issue.")
-                                 
+                    set_parent(object, parent_object)
+            except ReferenceError:
+                continue
+            except Exception as e:
+                print(f"[ISSUE] Exception {e} caught. Research it, fix the issue, try again.")
+                                
         return {'FINISHED'}
        
     def get_parent(self, child: bpy.types.Object) -> bpy.types.Object:
@@ -396,13 +331,13 @@ class OBJECT_OT_BodyParent(bpy.types.Operator):
             if "skeleton_root" in child.name or "model_root" in child.name:
                 return bpy.data.objects.get("scene_root")
 
-            # Numeric index in second part of name
-            elif len(name_parts) > 1 and name_parts[1].isnumeric():
+            # hips, torso, head
+            if len(name_parts) > 1 and name_parts[1].isnumeric():
                 parent_key = child.name[:-2]
                 return bpy.data.objects.get(f"{parents_dict[parent_key]}_{child.name[-1]}")
 
-            # Left or right
-            elif child.name.startswith(("l_", "r_")):
+            # legs, arms, hands
+            if child.name.startswith(("l_", "r_")):
                 if len(name_parts) > 3:  # extra piece
                     return bpy.data.objects.get(f"{name_parts[0]}_{name_parts[1]}_{child.name[-1]}")
                 
@@ -413,39 +348,17 @@ class OBJECT_OT_BodyParent(bpy.types.Operator):
             # Fallback: use first part of name
             else:
                 return bpy.data.objects.get(f"{name_parts[0]}_{child.name[-1]}")
-        except:
-            print(f"WARNING: {child.name} could not be parented, missing parent object?")
-                    
-    def set_parent(self, child: bpy.types.Object, parent: bpy.types.Object) -> None:
-        if not isinstance(child, bpy.types.Object):
-            raise TypeError(f"{child.name} must be an Object.")
-
-        if not isinstance(parent, bpy.types.Object):
-            raise TypeError(f"{parent.name} must be an Object.")
-        
-        try:
-            # Copy the world matrix
-            matrixcopy = child.matrix_world.copy()
-            
-            # Set the parent
-            child.parent = parent
-            
-            # Restore the world transform
-            child.matrix_world = matrixcopy
-            
-            print(f"{child.name} parented to {parent.name}")
-            
-        except:
-            print("Something went wrong with parenting {child.name} to {parent.name}")
-                       
+        except Exception as e:
+            print(f"[ISSUE] Exception {e} caught. Research it, fix the issue, try again.")
+                                      
     def should_skip(self, object: bpy.types.Object) -> bool:        
         if not isinstance(object, bpy.types.Object):
             raise TypeError(f"{object.name} must be an Object.")
         
         if "stupidtriangle" in object.name:
-            print(f"{object.name} deleted.")
             object.select_set(True)
             bpy.ops.object.delete(use_global=True, confirm=True)
+            print(f"{object.name} deleted.")
             return True
         
         if object.g2_prop_tag or object.name == "scene_root" or "_cap_" in object.name:
@@ -486,57 +399,38 @@ class OBJECT_OT_CapParent(bpy.types.Operator):
     def execute(self, context):
         os.system('cls')  # Clears the console (Windows only)
 
-        for object in obj_lookup.values():
+        for object in iter_live_objects():
             try:
                 if self.should_skip(object):
                     continue
                 
-                if object.type == 'MESH':
+                if object.type is 'MESH':
                     triangulate(object)
                     
                     parent_object = self.get_parent(object)
                     
                     if parent_object:
-                        self.set_parent(object, parent_object)
+                        set_parent(object, parent_object)
                     else:
-                        print(f"WARNING: {parent_object.name} not found for {object.name}.")
+                        print(f"WARNING: Parent not found for {object.name}.")
                         
-            except:
-                print(f"WARNING: unknown issue occured with {object.name}")
-                                     
+            except ReferenceError:
+                continue
+            except Exception as e:
+                print(f"[ISSUE] Exception {e} caught. Research it, fix the issue, try again.")
+                                    
         return {'FINISHED'}
       
     def get_parent(self, child: bpy.types.Object) -> bpy.types.Object:
         if not isinstance(child, bpy.types.Object):
             raise TypeError(f"{child.name} must be an Object.")
-        # Split the object name into parts
+        
         name_parts = child.name.split("_")
         
-        # Handle cases like l_arm_cap_0
         if name_parts[0] in {"l", "r"}:
             return bpy.data.objects.get(f"{name_parts[0]}_{name_parts[1]}_{name_parts[-1]}")
         
-        # Handle cases like torso_cap_0
         return bpy.data.objects.get(f"{name_parts[0]}_{name_parts[-1]}")
-    
-    def set_parent(self, child: bpy.types.Object, parent: bpy.types.Object) -> None:
-        if not isinstance(child, bpy.types.Object):
-            raise TypeError(f"{child.name} must be an Object.")
-
-        if not isinstance(parent, bpy.types.Object):
-            raise TypeError(f"{parent.name} must be an Object.")
-        
-        try:
-            # Copy the world matrix
-            matrixcopy = child.matrix_world.copy()          
-            # Set the parent
-            child.parent = parent 
-            # Restore the world transform
-            child.matrix_world = matrixcopy       
-            print(f"{child.name} parented to {parent.name}")
-            
-        except:
-            print("Something went wrong with parenting {child.name} to {parent.name}")
 
     def should_skip(self, object: bpy.types.Object) -> bool:        
         if not isinstance(object, bpy.types.Object):
@@ -605,12 +499,14 @@ class SetG2Properties(bpy.types.Operator):
     def execute(self, context):
         os.system('cls')
         
-        for object in obj_lookup.values():
-            
-            if self.should_skip(object):
+        for object in iter_live_objects():
+            try:
+                if self.should_skip(object):
+                    continue
+                
+                self.set_g2_properties(object)
+            except ReferenceError:
                 continue
-            
-            self.set_g2_properties(object)
                                      
         return {'FINISHED'}
 
@@ -619,8 +515,8 @@ class SetG2Properties(bpy.types.Operator):
             raise TypeError(f"{object.name} must be an Object.")
 
         object.g2_prop_name = object.name[:-2]
-        object.g2_prop_shader = "" # Set this manually if need be
-        object.g2_prop_scale = 100.0 
+        object.g2_prop_shader = "" # Used for MD3 as far as I know
+        object.g2_prop_scale = 100.0 # Don't change this unless you know what you're doing
                     
         if "_off" in object.name[:-2]:
             object.g2_prop_off = True
@@ -658,8 +554,13 @@ class OBJECT_OT_UnparentAll(bpy.types.Operator):
     def execute(self, context):
         os.system('cls')
         
-        for object in obj_lookup.values():
-            matrixcopy = object.matrix_world.copy()
+        for object in iter_live_objects():
+            try:
+                matrixcopy = object.matrix_world.copy()
+            except ReferenceError:
+                # Object has been deleted, skip it
+                continue
+
             object.parent = None 
             object.matrix_world = matrixcopy
         
@@ -680,12 +581,14 @@ class OBJECT_OT_Clean(bpy.types.Operator):
     def execute(self, context): 
         os.system('cls')
         
-        for object in obj_lookup.values():   
-                  
-            if ".00" in object.name:
-                object.select_set(True)
-                bpy.ops.object.delete(use_global=True, confirm=True)
-        
+        for object in iter_live_objects():
+            try:
+                if ".00" in object.name:
+                    object.select_set(True)
+                    bpy.ops.object.delete(use_global=True, confirm=True)
+            except ReferenceError:
+                continue
+       
         return {'FINISHED'}
 
 ################################################################################################
@@ -733,23 +636,30 @@ class OBJECT_OT_CreateSkinFile(bpy.types.Operator):
             
         try:
             with open(path + f"/model_{shadername}.skin", "w") as file: 
-                modelparts = ""
-                caps = ""
+                modelparts = []
+                caps = []
                 roots = ("skeleton_root", "model_root", "scene_root")
 
-                for object in obj_lookup.values():
-                    # Skip model_root, scene_root and skeleton_root, tags and objects without an active_material set.
-                    if object.type != "MESH" or object.g2_prop_tag or any(root in object.name for root in roots):
+                for object in iter_live_objects():
+                    try:
+                        check_object_isinstance(object)
+
+                        # Skip model_root, scene_root and skeleton_root, tags and objects without an active_material set.
+                        if object.type != "MESH" or object.g2_prop_tag or any(root in object.name for root in roots):
+                            continue
+                        
+                        if object.g2_prop_off:
+                            caps.append(f"{object.g2_prop_name},models/players/stormtrooper/caps.tga")
+                            continue
+                        
+                        materialname = (re.sub(r'\.\d+$', '', self.get_image(object))) if self.get_image(object) else None
+                        modelparts.append(f"{object.g2_prop_name},models/players/{modelname}/{materialname}.tga")
+                    except ReferenceError:
                         continue
-                    
-                    if object.g2_prop_off:
-                        caps += f"{object.g2_prop_name},models/players/stormtrooper/caps.tga\n"
-                        continue
-                    
-                    materialname = (re.sub(r'\.\d+$', '', self.get_image(object))) if self.get_image(object) else None
-                    modelparts += f"{object.g2_prop_name},models/players/{modelname}/{materialname}.tga\n"
                 
-                output = f"{modelparts}\n{caps}"
+                model = "".join(modelparts).join(caps)
+
+                output = self.write_output(model)
                 
                 # Write to the file
                 file.write(output)
@@ -762,44 +672,22 @@ class OBJECT_OT_CreateSkinFile(bpy.types.Operator):
             self.report({'ERROR'}, f"Failed to create .skin file: {e}")
             return {'CANCELLED'}
     
+    def write_output(self, model: list):
+        output = ""
+        for part in model:
+            output += f"{part}\n"
+        return output
+
     def invoke(self, context, event) -> None:
         return context.window_manager.invoke_props_dialog(self)
     
-    def get_image(self, object) -> str:
-        if object.active_material:
-            material = object.active_material
-            print("1")
-            # Check if the material uses nodes
-            if material.use_nodes:
-                # Get the node tree of the material
-                nodes = material.node_tree.nodes
-                print("2")
-                # Find the Principled BSDF node
-                for node in nodes:
-                    if node.type == 'BSDF_PRINCIPLED':
-                        # Check if Base Color is linked
-                        base_color_input = node.inputs['Base Color']
-                        print("3")
-                        if base_color_input.is_linked:
-                            # Get the node linked to Base Color
-                            linked_node = base_color_input.links[0].from_node
-                            
-                            if linked_node.type == 'TEX_IMAGE':
-                                # Get the image from the image texture node
-                                image = linked_node.image
-                            else:
-                                print("Base Color is not linked to an image texture.")
-                        else:
-                            print("Base Color is not linked.")
-                            return "unknown"
-                    else:
-                        print("Principled BSDF node not found.")
-                        return "unknown"
-            else:
-                return "unknown"
-        else:
-            return object.active_material.name.split("/")[-1][:-4]
-        return image.name[:-4]
+    def get_image(self, object: bpy.types.Object) -> str:
+        texture_full_filepath = object.active_material.node_tree.nodes["Image Texture"].image.filepath
+        
+        # Normalize the seperators and split it at "base/"
+        texture = texture_full_filepath.replace("\\", "/")
+        return texture.split("base/", 1)[1]
+        
 
 ################################################################################################
 ##                                                                                            ##
@@ -819,33 +707,30 @@ class OBJECT_OT_SelectObjectType(bpy.types.Operator):
         bpy.ops.object.select_all(action='DESELECT')
         
         settings = bpy.context.scene.settings
-        scene_collection = bpy.context.scene.collection
             
-        for object in obj_lookup.values():
-            if self.should_skip(object):
-                continue
-            
+        for object in iter_live_objects():
             try:
+                check_object_isinstance(object)
+
+                if self.should_skip(object):
+                    continue
+                
                 if settings.meshes and (not object.g2_prop_tag and "_cap_" not in object.name):
                     object.select_set(True)
                 
                 if settings.tags and object.g2_prop_tag:
                     object.select_set(True)
                 
-                if settings.caps and object.g2_prop_off:
+                if settings.caps and object.g2_prop_off and "_cap_" in object.name:
                     object.select_set(True)
-            except:
-                if object.name not in scene_collection.objects:
-                    print(f"WARNING: {object.name} was not selected. It's in a different collection.")
-                else:
-                    print(f"WARNING: {object.name} was not selected, reason unknown.")
+            except ReferenceError:
+                continue
+            except Exception as e:
+                print(f"[ISSUE] Exception {e} caught.")
         
         return {'FINISHED'} 
     
-    def should_skip(self, object: bpy.types.Object) -> bool:        
-        if not isinstance(object, bpy.types.Object):
-            raise TypeError(f"{object.name} must be an Object.")
-        
+    def should_skip(self, object: bpy.types.Object) -> bool:                
         if object.type != 'MESH':
             return True
         
@@ -869,25 +754,26 @@ class OBJECT_OT_SetArmature(bpy.types.Operator):
     def execute(self, context): 
         os.system('cls')
 
-        for object in obj_lookup.values():
-        
-            if self.should_skip(object):
+        for object in iter_live_objects():
+            try:
+                check_object_isinstance(object)
+
+                if self.should_skip(object):
+                    continue
+                
+                # Make sure we have only 1 armature modifier
+                for mod in object.modifiers:    
+                    if mod.type == 'ARMATURE':
+                        object.modifiers.remove(mod)
+                
+                object.modifiers.new("Armature", type="ARMATURE")       
+                object.modifiers["Armature"].object = bpy.data.objects["skeleton_root"] 
+            except ReferenceError:
                 continue
-            
-            # Make sure we have only 1 armature modifier
-            for mod in object.modifiers:    
-                if mod.type == 'ARMATURE':
-                    object.modifiers.remove(mod)
-            
-            object.modifiers.new("Armature", type="ARMATURE")       
-            object.modifiers["Armature"].object = bpy.data.objects["skeleton_root"] 
-    
+        
         return {'FINISHED'}
     
     def should_skip(self, object: bpy.types.Object) -> bool:        
-        if not isinstance(object, bpy.types.Object):
-            raise TypeError(f"{object.name} must be an Object.")
-        
         if "stupidtriangle" in object.name:
             print(f"{object.name} deleted.")
             object.select_set(True)
@@ -916,22 +802,22 @@ class OBJECT_OT_RemoveEmptyVertexGroups(bpy.types.Operator):
     def execute(self, context):      
         os.system('cls')
         
-        try:
-            for object in obj_lookup.values():
+        for object in iter_live_objects():
+            try:
+                check_object_isinstance(object)
                 
                 if self.should_skip(object):
                     continue
                 
                 self.remove_vertex_groups(object)
-        except:
-            print(f"WARNING: No possible object selected.")
+            except ReferenceError:
+                continue
+            except Exception as e:
+                print(f"[ISSUE] Exception {e} caught while removing vertex groups.")
     
         return {'FINISHED'}
     
-    def remove_vertex_groups(self, object: bpy.types.Object) -> None:
-        if not isinstance(object, bpy.types.Object):
-            raise TypeError(f"{object.name} must be an Object.")
-                    
+    def remove_vertex_groups(self, object: bpy.types.Object) -> None:                   
         # List to store vertex groups to remove
         vertex_groups_to_remove = []
 
@@ -957,10 +843,7 @@ class OBJECT_OT_RemoveEmptyVertexGroups(bpy.types.Operator):
         for vgroup in vertex_groups_to_remove:
             object.vertex_groups.remove(vgroup)
 
-    def should_skip(self, object: bpy.types.Object) -> bool:        
-        if not isinstance(object, bpy.types.Object):
-            raise TypeError(f"{object.name} must be an Object.")
-        
+    def should_skip(self, object: bpy.types.Object) -> bool:      
         if "stupidtriangle" in object.name:
             print(f"{object.name} deleted.")
             object.select_set(True)
@@ -1137,7 +1020,33 @@ def triangulate(object: bpy.types.Object) -> None:
         # Apply the modifier
         bpy.context.view_layer.objects.active = object
         bpy.ops.object.modifier_apply(modifier="Triangulate") 
+
+def set_parent(child: bpy.types.Object, parent: bpy.types.Object) -> None:
+    if not isinstance(child, bpy.types.Object):
+        raise TypeError(f"{child.name} must be an Object.")
+
+    if not isinstance(parent, bpy.types.Object):
+        raise TypeError(f"{parent.name} must be an Object.")
+    
+    try:
+        # Copy the world matrix
+        matrixcopy = child.matrix_world.copy()
         
+        # Set the parent
+        child.parent = parent
+        
+        # Restore the world transform
+        child.matrix_world = matrixcopy
+        
+        print(f"{child.name} parented to {parent.name}")
+        
+    except Exception as e:
+        print(f"[ISSUE] Exception {e} caught. Research it, fix the issue, try again.")     
+
+def check_object_isinstance(object: bpy.types.Object) -> bool:
+    if not isinstance(object, bpy.types.Object):
+        raise TypeError(f"{object.name} must be an Object.")
+    return True
 
 classes = [
     OBJECT_OT_ReplaceObject,
