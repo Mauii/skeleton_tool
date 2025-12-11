@@ -160,11 +160,11 @@ class OBJECT_OT_CreateTags(bpy.types.Operator):
         return obj    
     
     def apply_g2_properties(self, obj, mesh_data):
-        obj.g2_prop_name = mesh_data['name']
-        obj.g2_prop_shader = ""
-        obj.g2_prop_scale = 100.0
-        obj.g2_prop_off = False
-        obj.g2_prop_tag = True
+        obj.g2_prop.name = mesh_data['name']
+        obj.g2_prop.shader = ""
+        obj.g2_prop.scale = 100.0
+        obj.g2_prop.off = False
+        obj.g2_prop.tag = True
 
     def set_armature_modifier(self, obj):
         armature = bpy.data.objects.get("skeleton_root")
@@ -210,8 +210,7 @@ class OBJECT_OT_TagParent(bpy.types.Operator):
                 if self.should_skip(object):
                     continue
                                  
-                parent_name = self.get_parent(object)
-                parent_object = bpy.data.objects.get(parent_name)
+                parent_object = self.get_parent(object)
             
                 if parent_object:
                     set_parent(object, parent_object)
@@ -231,25 +230,25 @@ class OBJECT_OT_TagParent(bpy.types.Operator):
             
             # left check
             if base in 'l':
-                return f"l_{name_parts[1]}_{lod}"
+                return bpy.data.objects.get(f"l_{name_parts[1]}_{lod}")
             
             # right check
             if base in 'r':
-                return f"r_{name_parts[1]}_{lod}"
+                return bpy.data.objects.get(f"r_{name_parts[1]}_{lod}")
             
             if base in "hip":
-                return f"torso_{lod}"
+                return bpy.data.objects.get(f"torso_{lod}")
 
             # hips check
             if base in "hips":
-                return f"hips_{lod}"
+                return bpy.data.objects.get(f"hips_{lod}")
             
             #head check
             if base in "head":
-                return f"head_{lod}"
+                return bpy.data.objects.get(f"head_{lod}")
                 
             # fallback to torso
-            return f"torso_{lod}"
+            return bpy.data.objects.get(f"torso_{lod}")
         except:
             print(f"WARNING: {object.name} caused an unknown problem.")
             
@@ -258,7 +257,7 @@ class OBJECT_OT_TagParent(bpy.types.Operator):
             raise TypeError(f"{object.name} must be an Object.")            
         
         # startswith * added as failsafe if tag object didn't get g2 props set 
-        if not object.g2_prop_tag or object.name.startswith("*"):
+        if not object.g2_prop.tag or not object.name.startswith("*"):
             return True
         
         return False
@@ -299,14 +298,14 @@ class OBJECT_OT_BodyParent(bpy.types.Operator):
     bl_description = "Parent all objects to their respective parents and apply triangulate if needed."
 
     def execute(self, context):
-        os.system('cls')  # Clears the console (Windows only)
+          # Clears the console (Windows only)
 
         for object in iter_live_objects():
             try:
                 if self.should_skip(object):
                     continue
                 
-                if object.type is 'MESH':
+                if object.type == 'MESH':
                     triangulate(object)
                 
                 parent_object = self.get_parent(object)
@@ -361,7 +360,7 @@ class OBJECT_OT_BodyParent(bpy.types.Operator):
             print(f"{object.name} deleted.")
             return True
         
-        if object.g2_prop_tag or object.name == "scene_root" or "_cap_" in object.name:
+        if object.g2_prop.tag or object.name == "scene_root" or "_cap_" in object.name:
             return True
         
         return False
@@ -397,14 +396,13 @@ class OBJECT_OT_CapParent(bpy.types.Operator):
     bl_description = "Parent all caps to their respective parents and apply triangulate if needed."
     
     def execute(self, context):
-        os.system('cls')  # Clears the console (Windows only)
 
         for object in iter_live_objects():
             try:
                 if self.should_skip(object):
                     continue
                 
-                if object.type is 'MESH':
+                if object.type == 'MESH':
                     triangulate(object)
                     
                     parent_object = self.get_parent(object)
@@ -442,7 +440,7 @@ class OBJECT_OT_CapParent(bpy.types.Operator):
             bpy.ops.object.delete(use_global=True, confirm=True)
             return True
         
-        if "_cap_" not in object.name or object.g2_prop_tag:
+        if "_cap_" not in object.name or object.g2_prop.tag:
             return True
         
         return False
@@ -478,7 +476,7 @@ class SetG2Properties(bpy.types.Operator):
     This class makes sure to set all g2_properties for all objects within the scene. This is needed for
     JKA to be able to run this model at all. Even modview needs it.
     
-    If you want to set a custom shader, change g2_prop_shader after using this function or it will be
+    If you want to set a custom shader, change g2_prop.shader after using this function or it will be
     overwritten by emptiness.
     
     ---------
@@ -497,7 +495,7 @@ class SetG2Properties(bpy.types.Operator):
     bl_description = "Set all Ghoul2 properties"
 
     def execute(self, context):
-        os.system('cls')
+        
         
         for object in iter_live_objects():
             try:
@@ -514,26 +512,28 @@ class SetG2Properties(bpy.types.Operator):
         if not isinstance(object, bpy.types.Object):
             raise TypeError(f"{object.name} must be an Object.")
 
-        object.g2_prop_name = object.name[:-2]
-        object.g2_prop_shader = "" # Used for MD3 as far as I know
-        object.g2_prop_scale = 100.0 # Don't change this unless you know what you're doing
+        object.g2_prop.name = object.name[:-2]
+        object.g2_prop.shader = "" # Used for MD3 as far as I know
+
+        if "skeleton_root" in object.name:
+            object.g2_prop.scale = 100.0 # Don't change this unless you know what you're doing
                     
         if "_off" in object.name[:-2]:
-            object.g2_prop_off = True
-            object.g2_prop_tag = False
+            object.g2_prop.off = True
+            object.g2_prop.tag = False
             
         elif object.name.startswith("*"):
-            object.g2_prop_tag = True
+            object.g2_prop.tag = True
             
         else:
-            object.g2_prop_off = False
-            object.g2_prop_tag = False
+            object.g2_prop.off = False
+            object.g2_prop.tag = False
         
     def should_skip(self, object: bpy.types.Object) -> bool:        
         if not isinstance(object, bpy.types.Object):
             raise TypeError(f"{object.name} must be an Object.")
         
-        if object.type != 'MESH':
+        if object.type != 'MESH' or object.type != 'ARMATURE':
             return True
         
         return False
@@ -552,7 +552,7 @@ class OBJECT_OT_UnparentAll(bpy.types.Operator):
     bl_label = "Unparent All"
 
     def execute(self, context):
-        os.system('cls')
+        
         
         for object in iter_live_objects():
             try:
@@ -579,7 +579,7 @@ class OBJECT_OT_Clean(bpy.types.Operator):
     bl_label = "Clean duplicates"
 
     def execute(self, context): 
-        os.system('cls')
+        
         
         for object in iter_live_objects():
             try:
@@ -645,15 +645,15 @@ class OBJECT_OT_CreateSkinFile(bpy.types.Operator):
                         check_object_isinstance(object)
 
                         # Skip model_root, scene_root and skeleton_root, tags and objects without an active_material set.
-                        if object.type != "MESH" or object.g2_prop_tag or any(root in object.name for root in roots):
+                        if object.type != "MESH" or object.g2_prop.tag or any(root in object.name for root in roots):
                             continue
                         
-                        if object.g2_prop_off:
-                            caps.append(f"{object.g2_prop_name},models/players/stormtrooper/caps.tga")
+                        if object.g2_prop.off:
+                            caps.append(f"{object.g2_prop.name},models/players/stormtrooper/caps.tga")
                             continue
                         
                         materialname = (re.sub(r'\.\d+$', '', self.get_image(object))) if self.get_image(object) else None
-                        modelparts.append(f"{object.g2_prop_name},models/players/{modelname}/{materialname}.tga")
+                        modelparts.append(f"{object.g2_prop.name},models/players/{modelname}/{materialname}.tga")
                     except ReferenceError:
                         continue
                 
@@ -702,7 +702,7 @@ class OBJECT_OT_SelectObjectType(bpy.types.Operator):
     bl_label = "Model part select"
     
     def execute(self, context): 
-        os.system('cls')
+        
         
         bpy.ops.object.select_all(action='DESELECT')
         
@@ -715,13 +715,13 @@ class OBJECT_OT_SelectObjectType(bpy.types.Operator):
                 if self.should_skip(object):
                     continue
                 
-                if settings.meshes and (not object.g2_prop_tag and "_cap_" not in object.name):
+                if settings.meshes and (not object.g2_prop.tag and "_cap_" not in object.name):
                     object.select_set(True)
                 
-                if settings.tags and object.g2_prop_tag:
+                if settings.tags and object.g2_prop.tag:
                     object.select_set(True)
                 
-                if settings.caps and object.g2_prop_off and "_cap_" in object.name:
+                if settings.caps and object.g2_prop.off and "_cap_" in object.name:
                     object.select_set(True)
             except ReferenceError:
                 continue
@@ -752,7 +752,7 @@ class OBJECT_OT_SetArmature(bpy.types.Operator):
     bl_description = "Setup an armature modifier with skeleton_root"
     
     def execute(self, context): 
-        os.system('cls')
+        
 
         for object in iter_live_objects():
             try:
@@ -800,7 +800,7 @@ class OBJECT_OT_RemoveEmptyVertexGroups(bpy.types.Operator):
     bl_label = "Remove Empty VGroups"
     
     def execute(self, context):      
-        os.system('cls')
+        
         
         for object in iter_live_objects():
             try:
@@ -867,7 +867,7 @@ class OBJECT_OT_CreateRoot(bpy.types.Operator):
     bl_label = "Create Model/Scene"
     
     def execute(self, context): 
-        os.system('cls')
+        
 
         scene_collection = bpy.context.scene.collection
 
@@ -900,7 +900,7 @@ class OBJECT_OT_OrigintoGeometry(bpy.types.Operator):
     bl_label = "Set Origin to Geometry"
     
     def execute(self, context): 
-        os.system('cls')
+        
         
         for object in bpy.context.scene.objects:
             if object.type == 'MESH':

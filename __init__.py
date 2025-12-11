@@ -11,6 +11,7 @@ bl_info = {
 import bpy
 import importlib.util
 import sys
+from collections.abc import Iterable
 from .mod_reload import reload_modules
 reload_modules(locals(), __package__, ["operators", "panels", "properties"], [])
 from .operators import register_operators, unregister_operators
@@ -34,14 +35,28 @@ def find_parent_folder_of_file(filename):
 
     return None
 
-def import_package_from_file(filename, package_name=None):
+def import_package_from_file(filenames, package_name=None):
     """
-    Find a file in addons and import its parent folder as a package.
+    Find a file or a collection of files in addons and import the parent
+    folder as a package.
     Returns the imported package module, or None if not found.
     """
-    folder_path = find_parent_folder_of_file(filename)
+    if isinstance(filenames, (str, Path)):
+        filenames = [filenames]
+
+    if not isinstance(filenames, Iterable):
+        filenames = [filenames]
+
+    filenames = [str(f) for f in filenames]
+
+    folder_path = None
+    for filename in filenames:
+        folder_path = find_parent_folder_of_file(filename)
+        if folder_path:
+            break
+
     if not folder_path:
-        print(f"Parent folder for '{filename}' not found or missing __init__.py")
+        print(f"Parent folder for '{', '.join(filenames)}' not found or missing __init__.py")
         return None
 
     folder_path = Path(folder_path)
@@ -54,7 +69,7 @@ def import_package_from_file(filename, package_name=None):
     sys.modules[package_name] = module
     spec.loader.exec_module(module)
     print(f"Package '{package_name}' imported from {folder_path}")
-    
+
     return module
 
 import_package_from_file("JAG2GLM.py")
