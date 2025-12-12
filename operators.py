@@ -645,10 +645,19 @@ class OBJECT_OT_CreateSkinFile(bpy.types.Operator):
                         check_object_isinstance(object)
 
                         # Skip model_root, scene_root and skeleton_root, tags and objects without an active_material set.
-                        if object.type != "MESH" or object.g2_prop.tag or any(root in object.name for root in roots):
+                        if object.type != "MESH":
+                            continue
+
+                        if object.g2_prop.tag:
+                            continue
+
+                        if not object.name.endswith("_0"):
+                            continue
+
+                        if any(root in object.name for root in roots):
                             continue
                         
-                        if object.g2_prop.off:
+                        if object.g2_prop.off and "_cap_" in object.name:
                             caps.append(f"{object.g2_prop.name},models/players/stormtrooper/caps.tga")
                             continue
                         
@@ -657,9 +666,9 @@ class OBJECT_OT_CreateSkinFile(bpy.types.Operator):
                     except ReferenceError:
                         continue
                 
-                model = "".join(modelparts).join(caps)
+                model_lines = modelparts + caps
 
-                output = self.write_output(model)
+                output = self.write_output(model_lines)
                 
                 # Write to the file
                 file.write(output)
@@ -681,12 +690,29 @@ class OBJECT_OT_CreateSkinFile(bpy.types.Operator):
     def invoke(self, context, event) -> None:
         return context.window_manager.invoke_props_dialog(self)
     
-    def get_image(self, object: bpy.types.Object) -> str:
-        texture_full_filepath = object.active_material.node_tree.nodes["Image Texture"].image.filepath
-        
-        # Normalize the seperators and split it at "base/"
-        texture = texture_full_filepath.replace("\\", "/")
-        return texture.split("base/", 1)[1]
+    def get_image(self, object: bpy.types.Object) -> str | None:
+        if not isinstance(object, bpy.types.Object):
+            return None
+
+        material = getattr(object, "active_material", None)
+        if not material:
+            return None
+
+        node_tree = getattr(material, "node_tree", None)
+        if not node_tree:
+            return None
+
+        image_node = next((node for node in node_tree.nodes if getattr(node, "type", "") == "TEX_IMAGE"), None)
+        image = getattr(image_node, "image", None)
+        filepath = getattr(image, "filepath", None)
+        if not filepath:
+            return None
+
+        texture = filepath.replace("\\", "/")
+        if "base/" in texture:
+            return texture.split("base/", 1)[1]
+
+        return texture
         
 
 ################################################################################################
