@@ -661,7 +661,12 @@ class OBJECT_OT_CreateSkinFile(bpy.types.Operator):
                             caps.append(f"{object.g2_prop.name},models/players/stormtrooper/caps.tga")
                             continue
                         
-                        materialname = (re.sub(r'\.\d+$', '', self.get_image(object))) if self.get_image(object) else None
+                        texture = self.get_image(object)
+                        if texture:
+                            texture = re.sub(r'\.\d+$', '', texture)
+                            texture = os.path.basename(texture)
+                            texture = os.path.splitext(texture)[0]
+                        materialname = texture if texture else None
                         modelparts.append(f"{object.g2_prop.name},models/players/{modelname}/{materialname}.tga")
                     except ReferenceError:
                         continue
