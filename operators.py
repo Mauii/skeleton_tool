@@ -139,7 +139,7 @@ class OBJECT_OT_CreateTags(bpy.types.Operator):
         self.set_armature_modifier(obj)
         return obj
 
-    def create_bmesh_from_mesh(self, mesh_data):
+    def create_bmesh_from_mesh(self, mesh, mesh_data):
         bm = bmesh.new()
         vertex_map = {}
         for vert in mesh_data['vertices']:
