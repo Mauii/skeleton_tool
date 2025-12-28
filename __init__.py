@@ -12,8 +12,6 @@ import bpy
 import importlib.util
 import sys
 from collections.abc import Iterable
-from .mod_reload import reload_modules
-reload_modules(locals(), __package__, ["operators", "panels", "properties"], [])
 from .operators import register_operators, unregister_operators
 from .panels import register_panels, unregister_panels
 from .properties import register_properties, unregister_properties
