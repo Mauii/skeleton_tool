@@ -4,7 +4,7 @@ A Blender add-on that accelerates preparing models for Jedi Knight: Jedi Academy
 
 ## Compatibility
 - Tested with Blender 5.0+.
-- Add-on version **4.6.0** reflects the Blender version it targets and contains safeguards against `ReferenceError` leaks when dangling objects disappear.
+- Add-on version **5.0.0** reflects the Blender version it targets and contains safeguards against `ReferenceError` leaks when dangling objects disappear.
 
 ## Installation
 1. Copy the `skeleton_tool` folder into `Blender/<version>/scripts/addons/`.
