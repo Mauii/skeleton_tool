@@ -19,7 +19,6 @@ A Blender add-on that accelerates preparing models for Jedi Knight: Jedi Academy
 - Armature modifier calculator, empty vertex group remover, and origin/alignment helpers.
 
 ## Usage notes
-- The add-on keeps a lookup of scene objects but refreshes before each operation through `iter_live_objects()` to avoid `ReferenceError: structrna of type object has been removed` when objects vanish.
 - When replacing an object, transforms are preserved by capturing and restoring `matrix_world` copies.
 - Always run **Set G2 Properties** before exporting or parenting so every mesh follows naming conventions.
 
