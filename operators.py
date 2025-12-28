@@ -116,10 +116,10 @@ class OBJECT_OT_CreateTags(bpy.types.Operator):
         return sorted(model_roots)
     
     def apply_g2_properties(self, obj, mesh_data):
-        obj.g2_prop_name = mesh_data['name']
-        obj.g2_prop_shader = ""
-        obj.g2_prop_off = False
-        obj.g2_prop_tag = True
+        obj.g2_prop.name = mesh_data['name']
+        obj.g2_prop.shader = ""
+        obj.g2_prop.off = False
+        obj.g2_prop.tag = True
 
 class OBJECT_OT_TagParent(bpy.types.Operator):  
     bl_idname = "parent.tags"
@@ -179,7 +179,7 @@ class OBJECT_OT_TagParent(bpy.types.Operator):
     def should_skip(self, object: bpy.types.Object) -> bool:          
         
         # startswith * added as failsafe if tag object didn't get g2 props set 
-        if not object.g2_prop_tag or not object.name.startswith("*"):
+        if not object.g2_prop.tag or not object.name.startswith("*"):
             return True
         
         return False
@@ -277,7 +277,7 @@ class OBJECT_OT_BodyParent(bpy.types.Operator):
             print(f"{object.name} deleted.")
             return True
         
-        if object.g2_prop_tag or object.name == "scene_root" or "_cap_" in object.name:
+        if object.g2_prop.tag or object.name == "scene_root" or "_cap_" in object.name:
             return True
         
         return False
@@ -354,7 +354,7 @@ class OBJECT_OT_CapParent(bpy.types.Operator):
             bpy.ops.object.delete(use_global=True, confirm=True)
             return True
         
-        if "_cap_" not in object.name or object.g2_prop_tag:
+        if "_cap_" not in object.name or object.g2_prop.tag:
             return True
         
         return False
@@ -390,7 +390,7 @@ class SetG2Properties(bpy.types.Operator):
     This class makes sure to set all g2_properties for all objects within the scene. This is needed for
     JKA to be able to run this model at all. Even modview needs it.
     
-    If you want to set a custom shader, change g2_prop_shader after using this function or it will be
+    If you want to set a custom shader, change g2_prop.shader after using this function or it will be
     overwritten by emptiness.
     
     ---------
@@ -538,7 +538,7 @@ class OBJECT_OT_CreateSkinFile(bpy.types.Operator):
                         if object.type != "MESH":
                             continue
 
-                        if object.g2_prop_tag:
+                        if object.g2_prop.tag:
                             continue
 
                         if not object.name.endswith("_0"):
@@ -547,8 +547,8 @@ class OBJECT_OT_CreateSkinFile(bpy.types.Operator):
                         if any(root in object.name for root in roots):
                             continue
                         
-                        if object.g2_prop_off and "_cap_" in object.name:
-                            caps.append(f"{object.g2_prop_name},models/players/stormtrooper/caps.tga")
+                        if object.g2_prop.off and "_cap_" in object.name:
+                            caps.append(f"{object.g2_prop.name},models/players/stormtrooper/caps.tga")
                             continue
                         
                         texture = self.get_image(object)
@@ -557,7 +557,7 @@ class OBJECT_OT_CreateSkinFile(bpy.types.Operator):
                             texture = os.path.basename(texture)
                             texture = os.path.splitext(texture)[0]
                         materialname = texture if texture else None
-                        modelparts.append(f"{object.g2_prop_name},models/players/{modelname}/{materialname}.tga")
+                        modelparts.append(f"{object.g2_prop.name},models/players/{modelname}/{materialname}.tga")
                     except ReferenceError:
                         continue
                 
@@ -632,13 +632,13 @@ class OBJECT_OT_SelectObjectType(bpy.types.Operator):
                 if self.should_skip(object):
                     continue
                 
-                if settings.meshes and (not object.g2_prop_tag and "_cap_" not in object.name):
+                if settings.meshes and (not object.g2_prop.tag and "_cap_" not in object.name):
                     object.select_set(True)
                 
-                if settings.tags and object.g2_prop_tag:
+                if settings.tags and object.g2_prop.tag:
                     object.select_set(True)
                 
-                if settings.caps and object.g2_prop_off and "_cap_" in object.name:
+                if settings.caps and object.g2_prop.off and "_cap_" in object.name:
                     object.select_set(True)
             except ReferenceError:
                 continue
@@ -968,19 +968,19 @@ def check_object_isinstance(object: bpy.types.Object) -> bool:
     return True
 
 def set_g2_properties(self, object: bpy.types.Object) -> None:
-    object.g2_prop_name = object.name[:-2]
-    object.g2_prop_shader = "" # Used for MD3 as far as I know
+    object.g2_prop.name = object.name[:-2]
+    object.g2_prop.shader = "" # Used for MD3 as far as I know
                 
     if "_off" in object.name[:-2]:
-        object.g2_prop_off = True
-        object.g2_prop_tag = False
+        object.g2_prop.off = True
+        object.g2_prop.tag = False
         
     elif object.name.startswith("*"):
-        object.g2_prop_tag = True
+        object.g2_prop.tag = True
         
     else:
-        object.g2_prop_off = False
-        object.g2_prop_tag = False
+        object.g2_prop.off = False
+        object.g2_prop.tag = False
 
 classes = [
     OBJECT_OT_ReplaceObject,
