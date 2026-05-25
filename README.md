@@ -24,3 +24,6 @@ A Blender add-on that accelerates preparing models for Jedi Knight: Jedi Academy
 
 ## Contribution
 Feel free to open issues or pull requests on the [GitHub repository](https://github.com/Mauii/skeleton_tool/) if you find regressions with Blender releases newer than 4.5.
+
+## Special Credits & Thanks ##
+The Punisher - for creating an action log that shows you all changes done to the objects in the scene. 
