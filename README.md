@@ -20,7 +20,7 @@ A Blender add-on that accelerates preparing models for Jedi Knight: Jedi Academy
 
 ## Usage notes
 - When replacing an object, transforms are preserved by capturing and restoring `matrix_world` copies.
-- Always run **Set G2 Properties** before exporting or parenting so every mesh follows naming conventions.
+- Always run **Set G2 Properties** before exporting to prevent into running "Ghoul2 properties not set for x" errors.
 
 ## Contribution
 Feel free to open issues or pull requests on the [GitHub repository](https://github.com/Mauii/skeleton_tool/) if you find regressions with Blender releases newer than 4.5.
