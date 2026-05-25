@@ -17,6 +17,7 @@ A Blender add-on that accelerates preparing models for Jedi Knight: Jedi Academy
 - Export a `model_default.skin` file tailored for Stormtrooper caps and player models.
 - Select subsets (meshes, tags, caps) via the selection helper and maintain Ghoul2 property hygiene.
 - Armature modifier calculator, empty vertex group remover, and origin/alignment helpers.
+- An action log that shows all changes done by the addon. (Think about changing parenting, setting ghoul2 properties, ...) [Made by The Punisher]
 
 ## Usage notes
 - When replacing an object, transforms are preserved by capturing and restoring `matrix_world` copies.
@@ -26,4 +27,4 @@ A Blender add-on that accelerates preparing models for Jedi Knight: Jedi Academy
 Feel free to open issues or pull requests on the [GitHub repository](https://github.com/Mauii/skeleton_tool/) if you find regressions with Blender releases newer than 4.5.
 
 ## Special Credits & Thanks ##
-The Punisher - for creating an action log that shows you all changes done to the objects in the scene. 
+The Punisher - for creating an action log that shows you all changes done by the addon. 
