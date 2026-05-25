@@ -9,7 +9,7 @@ class OBJECT_PT_SkeletonTool(bpy.types.Panel):
     bl_context = "objectmode"
     bl_category = "Skeleton tool"
     bl_options = {'DEFAULT_CLOSED'}
-    
+
     def draw(self, context):
         layout = self.layout
         settings = context.scene.settings
@@ -17,7 +17,7 @@ class OBJECT_PT_SkeletonTool(bpy.types.Panel):
         # Helper for collapsible boxes
         def draw_box(label, toggle_prop, draw_content):
             row = layout.row()
-            row.prop(settings, toggle_prop, text=label, icon="REMOVE" if getattr(settings, toggle_prop) else "PLUS", emboss=False)
+            row.prop(settings, toggle_prop, text=label, icon="TRIA_DOWN" if getattr(settings, toggle_prop) else "TRIA_RIGHT", emboss=False)
             if getattr(settings, toggle_prop):
                 box = layout.box()
                 draw_content(box)
@@ -60,6 +60,45 @@ class OBJECT_PT_SkeletonTool(bpy.types.Panel):
             box.prop(settings, "caps"),
             box.prop(settings, "tags")
         ])
+
+        def draw_log(box):
+            """ Draw the log messages in the UI, with color coding for INFO, WARNING, and ERROR. """
+            layout = self.layout
+            layout.alert = False
+            box.operator("log.clear", icon="TRASH")
+            lines = [l for l in settings.log.split("\n") if l.strip()]
+
+            # Display log messages with color coding
+            if lines:
+                errors   = [l for l in lines if "[ERROR]" in l]
+                warnings = [l for l in lines if "[WARNING]" in l]
+                infos    = [l for l in lines if "[INFO]" in l]
+
+                # If there are any errors, show them with the error icon and alert color
+                if errors:
+                    layout.alert = True
+                    for line in errors:
+                        layout.label(text=line, icon='CANCEL')
+                    layout.alert = False
+
+                # If there are warnings, show them with the warning icon and alert color
+                if warnings:
+                    layout.alert = True
+                    for line in warnings:
+                        layout.label(text=line, icon='ERROR')
+                    layout.alert = False
+
+                # If there are infos, show them with the info icon and normal color
+                if infos:
+                    layout.alert = False
+                    for line in infos:
+                        layout.label(text=line, icon='CHECKMARK')
+
+            else:
+                # No log messages, show a placeholder
+                box.label(text="No actions logged yet.", icon="INFO")
+
+        draw_box("Log", "show_log", draw_log)
 
 def register_panels():
     bpy.utils.register_class(OBJECT_PT_SkeletonTool)

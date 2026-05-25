@@ -1,8 +1,8 @@
 bl_info = {
     "name": "Skeleton Tool",
     "author": "Maui",
-    "version": (5, 0, 0),
-    "blender": (5, 0),
+    "version": (3, 5),
+    "blender": (4, 5),
     "location": "Press N - Select Skeleton tool",
     "description": "This addon has many features that decrease time wasted when preparing a model for JKA.",
     "category": "Modelling / Rigging",
@@ -11,7 +11,8 @@ bl_info = {
 import bpy
 import importlib.util
 import sys
-from collections.abc import Iterable
+from .mod_reload import reload_modules
+reload_modules(locals(), __package__, ["operators", "panels", "properties"], [])
 from .operators import register_operators, unregister_operators
 from .panels import register_panels, unregister_panels
 from .properties import register_properties, unregister_properties
@@ -33,28 +34,14 @@ def find_parent_folder_of_file(filename):
 
     return None
 
-def import_package_from_file(filenames, package_name=None):
+def import_package_from_file(filename, package_name=None):
     """
-    Find a file or a collection of files in addons and import the parent
-    folder as a package.
+    Find a file in addons and import its parent folder as a package.
     Returns the imported package module, or None if not found.
     """
-    if isinstance(filenames, (str, Path)):
-        filenames = [filenames]
-
-    if not isinstance(filenames, Iterable):
-        filenames = [filenames]
-
-    filenames = [str(f) for f in filenames]
-
-    folder_path = None
-    for filename in filenames:
-        folder_path = find_parent_folder_of_file(filename)
-        if folder_path:
-            break
-
+    folder_path = find_parent_folder_of_file(filename)
     if not folder_path:
-        print(f"Parent folder for '{', '.join(filenames)}' not found or missing __init__.py")
+        print(f"Parent folder for '{filename}' not found or missing __init__.py")
         return None
 
     folder_path = Path(folder_path)
@@ -67,7 +54,7 @@ def import_package_from_file(filenames, package_name=None):
     sys.modules[package_name] = module
     spec.loader.exec_module(module)
     print(f"Package '{package_name}' imported from {folder_path}")
-
+    
     return module
 
 import_package_from_file("JAG2GLM.py")
@@ -84,4 +71,3 @@ def unregister():
 
 if __name__ == "__main__":
     register()
-

@@ -1,7 +1,7 @@
 import bpy
 from bpy.props import *
 
-class AddonProperties(bpy.types.PropertyGroup): 
+class AddonProperties(bpy.types.PropertyGroup):
     meshes : bpy.props.BoolProperty(name="Meshes",default=False)
     caps : bpy.props.BoolProperty(name="Caps",default=False)
     tags : bpy.props.BoolProperty(name="Tags",default=False)
@@ -12,10 +12,10 @@ class AddonProperties(bpy.types.PropertyGroup):
         maxlen = 1024,
         subtype = "DIR_PATH"
     )
-    
+
     shadername: bpy.props.StringProperty(name="Enter .skin name", default= "default")
     modelname: bpy.props.StringProperty(name="Enter model name", default="")
-    
+
     object1: bpy.props.StringProperty(name="Replace", search=lambda self, context, edit_text: [o.name for o in bpy.data.objects if edit_text.lower() in o.name.lower()])
     object2: bpy.props.StringProperty(name="With", search=lambda self, context, edit_text: [o.name for o in bpy.data.objects if edit_text.lower() in o.name.lower()])
     action: bpy.props.EnumProperty(
@@ -28,14 +28,16 @@ class AddonProperties(bpy.types.PropertyGroup):
     ],
     default='DELETE',
     )
-    
-   # Collapsible toggles
+
+    # Collapsible toggles
     show_parenting : BoolProperty(default=True)
     show_replace : BoolProperty(default=True)
     show_create : BoolProperty(default=True)
     show_set : BoolProperty(default=True)
     show_cleanup : BoolProperty(default=True)
     show_select : BoolProperty(default=True)
+    log: bpy.props.StringProperty(name="Log", default="") # Hold the log messages to be displayed in the UI panel
+    show_log: BoolProperty(default=True) # Toggle to show/hide the log in the UI panel
 
 def register_properties():
     bpy.utils.register_class(AddonProperties)
