@@ -39,6 +39,12 @@ class AddonProperties(bpy.types.PropertyGroup):
     log: bpy.props.StringProperty(name="Log", default="") # Hold the log messages to be displayed in the UI panel
     show_log: BoolProperty(default=True) # Toggle to show/hide the log in the UI panel
 
+    # Log filter toggles
+    log_show_errors   : BoolProperty(name="Errors",   default=True)
+    log_show_warnings : BoolProperty(name="Warnings", default=True)
+    log_show_details  : BoolProperty(name="Details",  default=True)
+    log_show_summary  : BoolProperty(name="Summary",  default=True)
+
 def register_properties():
     bpy.utils.register_class(AddonProperties)
     bpy.types.Scene.settings = bpy.props.PointerProperty(type=AddonProperties)

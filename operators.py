@@ -41,6 +41,7 @@ def force_ui_refresh(context):
 # Helper function to log actions in the addon log property
 ############################################################################################
 def log_action(context, message: str, level: str = "INFO"):
+    """Log a message to the addon's log property with a timestamp and severity level."""
     import datetime
     timestamp = datetime.datetime.now().strftime("%H:%M:%S")
     entry = f"[{timestamp}] [{level}] {message}"
@@ -51,6 +52,7 @@ def log_action(context, message: str, level: str = "INFO"):
 
 def clear_log(context):
     context.scene.settings.log = ""
+#end of log clear function
 
 class OBJECT_OT_ClearLog(bpy.types.Operator):
     """Clear the action log used for tracking operations and errors within the addon."""
@@ -109,7 +111,7 @@ class OBJECT_OT_CreateTags(bpy.types.Operator):
                 counter = counter + 1
 
         self.report({'INFO'}, f"Tags created for {len(model_roots)} model_root(s).")
-        log_action(context, f"Tags created for {len(model_roots)} model_root(s). ({counter} objects processed.)", level="INFO")
+        log_action(context, f"Tags created for {len(model_roots)} model_root(s). ({counter} objects processed.)", level="SUMMARY")
         force_ui_refresh(context)
         return {'FINISHED'}
 
@@ -206,7 +208,6 @@ class OBJECT_OT_CreateTags(bpy.types.Operator):
 
         return sorted(model_roots)
 
-
 ################################################################################################
 ##                                                                                            ##
 ##                                        PARENT TAGS                                         ##
@@ -240,9 +241,9 @@ class OBJECT_OT_TagParent(bpy.types.Operator):
         if not parent_all:
             clear_log(context)
 
-        counter = 0
-        warnings = 0
-        errors = 0
+        self.counter = 0
+        self.warnings = 0
+        self.errors = 0
 
         for object in bpy.data.objects:
 
@@ -256,23 +257,23 @@ class OBJECT_OT_TagParent(bpy.types.Operator):
                 # Check if the returned 'parent' actually exists
                 if bpy.data.objects.get(parent_name):
                     self.set_parent(object, parent_object)
-                    counter += 1
+                    self.counter += 1
                 else:
-                    warnings += 1
-                    print(f"Warning: Parent '{parent}' for tag '{object.name}' not found.")
+                    self.warnings += 1
+                    print(f"Warning: Parent '{parent_name}' for tag '{object.name}' not found.")
                     log_action(context, f"Parent '{parent_name}' for tag '{object.name}' not found.")
 
             except:
-                errors += 1
+                self.errors += 1
                 print(f"ERROR: {object.name} caused an unknown issue.")
                 log_action(context, f"An unknown issue occurred while processing tag '{object.name}'.", level="ERROR")
 
-        if warnings > 0:
-            log_action(context, f"{warnings} warnings occurred during tag parenting. Try fixing the G2 properties, then try again.", level="INFO")
-        if errors > 0:
-            log_action(context, f"{errors} errors occurred during tag parenting. Try fixing the G2 properties, then try again.", level="INFO")
+        if self.warnings > 0:
+            log_action(context, f"{self.warnings} warnings occurred during tag parenting. Try fixing the G2 properties, then try again.", level="SUMMARY")
+        if self.errors > 0:
+            log_action(context, f"{self.errors} errors occurred during tag parenting. Try fixing the G2 properties, then try again.", level="SUMMARY")
 
-        log_action(context, f"Tag parenting complete. ({counter} objects processed, {warnings} warnings, {errors} errors.)", level="INFO")
+        log_action(context, f"Tag parenting complete. ({self.counter} objects processed, {self.warnings} warnings, {self.errors} errors.)", level="SUMMARY")
 
         force_ui_refresh(context)
         return {'FINISHED'}
@@ -380,9 +381,9 @@ class OBJECT_OT_BodyParent(bpy.types.Operator):
         if not parent_all:
             clear_log(context)
 
-        counter = 0
-        warnings = 0
-        errors = 0
+        self.counter = 0
+        self.warnings = 0
+        self.errors = 0
 
         for object in bpy.data.objects:
             if self.should_skip(object):
@@ -396,23 +397,23 @@ class OBJECT_OT_BodyParent(bpy.types.Operator):
 
                 if parent_object:
                     self.set_parent(object, parent_object)
-                    counter += 1
+                    self.counter += 1
                 else:
-                    warnings += 1
+                    self.warnings += 1
                     log_action(context, f"Parent '{parent_object}' not found for {object.name}.", level="WARNING")
 
             except:
                 print(f"WARNING: {object.name} caused an unknown issue.")
                 log_action(context, f"An unknown issue occurred while processing {object.name}.", level="ERROR")
-                errors += 1
+                self.errors += 1
 
-        if warnings > 0:
-            log_action(context, f"{warnings} warnings occurred during CAP parenting. Try fixing the G2 properties, then try again.", level="INFO")
+        if self.warnings > 0:
+            log_action(context, f"{self.warnings} warnings occurred during CAP parenting. Try fixing the G2 properties, then try again.", level="SUMMARY")
 
-        if errors > 0:
-            log_action(context, f"{errors} errors occurred during CAP parenting. Try fixing the G2 properties, then try again.", level="INFO")
+        if self.errors > 0:
+            log_action(context, f"{self.errors} errors occurred during CAP parenting. Try fixing the G2 properties, then try again.", level="SUMMARY")
 
-        log_action(context, f"Parenting complete. ({counter} objects processed, {warnings} warnings, {errors} errors.)", level="INFO")
+        log_action(context, f"Parenting complete. ({self.counter} objects processed, {self.warnings} warnings, {self.errors} errors.)", level="SUMMARY")
 
         force_ui_refresh(context)
         return {'FINISHED'}
@@ -523,9 +524,9 @@ class OBJECT_OT_CapParent(bpy.types.Operator):
         if not parent_all:
             clear_log(context)
 
-        counter = 0
-        warnings = 0
-        errors = 0
+        self.counter = 0
+        self.warnings = 0
+        self.errors = 0
         for object in bpy.data.objects:
             try:
                 if self.should_skip(object):
@@ -538,24 +539,24 @@ class OBJECT_OT_CapParent(bpy.types.Operator):
 
                     if parent_object:
                         self.set_parent(object, parent_object)
-                        counter += 1
+                        self.counter += 1
                     else:
-                        warnings += 1
+                        self.warnings += 1
                         log_action(bpy.context, f"{parent_object.name} not found for {object.name}.", level="WARNING")
 
             except:
-                errors += 1
+                self.errors += 1
                 print(f"ERROR: unknown issue occurred with {object.name}")
                 log_action(bpy.context, f"An unknown issue occurred while processing {object.name}.", level="ERROR")
 
 
-        log_action(bpy.context, f"CAP Parenting complete. ({counter} objects processed. {warnings} warnings, {errors} errors)", level="INFO")
+        log_action(bpy.context, f"CAP Parenting complete. ({ self.counter} objects processed. {self.warnings} warnings, {self.errors} errors)", level="SUMMARY")
 
-        if warnings > 0:
-            log_action(bpy.context, f"{warnings} warnings occurred during CAP parenting.", level="INFO")
+        if self.warnings > 0:
+            log_action(bpy.context, f"{self.warnings} warnings occurred during CAP parenting.", level="SUMMARY")
 
-        if errors > 0:
-            log_action(bpy.context, f"{errors} errors occurred during CAP parenting. Try fixing the G2 properties, then try again.", level="INFO")
+        if self.errors > 0:
+            log_action(bpy.context, f"{self.errors} errors occurred during CAP parenting. Try fixing the G2 properties, then try again.", level="SUMMARY")
 
         force_ui_refresh(context)
         return {'FINISHED'}
@@ -629,7 +630,7 @@ class OBJECT_OT_AllParent(bpy.types.Operator):
         bpy.ops.parent.tags()
         bpy.ops.parent.caps()
         parent_all = False
-        log_action(context, "All parenting operations complete.", level="INFO")
+        log_action(context, "All parenting operations complete.", level="SUMMARY")
         return {'FINISHED'}
 
 
@@ -665,7 +666,7 @@ class OBJECT_OT_SetG2Properties(bpy.types.Operator):
     def execute(self, context):
         os.system('cls')
         clear_log(context)
-        counter = 0
+        self.counter = 0
         self.meshes_counter = 0
         self.tags_counter = 0
         self.caps_counter = 0
@@ -674,18 +675,21 @@ class OBJECT_OT_SetG2Properties(bpy.types.Operator):
         self.meshes_fixed = False
 
         for object in bpy.data.objects:
-
             if self.should_skip(object):
                 continue
 
             self.set_g2_properties(object)
-            counter += 1
-        log_action(context, f"G2 properties set for all objects. ({counter} objects processed.)", level="INFO")
-        log_action(context, f"{self.meshes_counter} meshes, {self.tags_counter} tags, {self.caps_counter} caps processed.", level="INFO")
+            self.counter += 1
+
+        log_action(context, f"G2 properties set for all objects. ({self.counter} objects processed.)", level="SUMMARY")
+        log_action(context, f"{self.meshes_counter} meshes, {self.tags_counter} tags, {self.caps_counter} caps processed.", level="SUMMARY")
         force_ui_refresh(context)
         return {'FINISHED'}
 
     def set_g2_properties(self, object: bpy.types.Object) -> None:
+        """Sets all G2 properties for the given object based on its name and type.
+        It also counts how many objects had to be fixed for each category (meshes, tags, caps) and logs any changes made to the properties."""
+
         if not isinstance(object, bpy.types.Object):
             raise TypeError(f"{object.name} must be an Object.")
 
@@ -697,6 +701,7 @@ class OBJECT_OT_SetG2Properties(bpy.types.Operator):
         object.g2_prop.scale = 100.0
 
         if "_off" in object.name[:-2]:
+            #CAP objects, should have ofOFF set to True and TAG set to False
             self.caps_fixed = False
             if object.g2_prop.off  is not True:
                 object.g2_prop.off = True
@@ -710,6 +715,7 @@ class OBJECT_OT_SetG2Properties(bpy.types.Operator):
                 self.caps_counter += 1
 
         elif object.name.startswith("*"):
+            # TAG objects, should have TAG set to True and OFF set to False
             self.tags_fixed = False
             if object.g2_prop.tag is not True:
                 object.g2_prop.tag = True
@@ -722,6 +728,7 @@ class OBJECT_OT_SetG2Properties(bpy.types.Operator):
             if self.tags_fixed:
                 self.tags_counter += 1
         else:
+            # Regular mesh, should have TAG and OFF set to False
             self.meshes_fixed = False
             if object.g2_prop.tag is not False:
                 object.g2_prop.tag = False
@@ -764,15 +771,15 @@ class OBJECT_OT_UnparentAll(bpy.types.Operator):
     def execute(self, context):
         os.system('cls')
         clear_log(context)
-        counter = 0
+        self.counter = 0
 
         for object in bpy.data.objects:
             matrixcopy = object.matrix_world.copy()
             object.parent = None
             object.matrix_world = matrixcopy
-            counter = counter + 1
+            self.counter = self.counter + 1
         force_ui_refresh(context)
-        log_action(context, f"All parenting removed. ({counter} objects processed.)")
+        log_action(context, f"All parenting removed. ({self.counter} objects processed.)", level="SUMMARY")
         return {'FINISHED'}
 
 ################################################################################################
@@ -790,16 +797,16 @@ class OBJECT_OT_Clean(bpy.types.Operator):
     def execute(self, context):
         os.system('cls')
         clear_log(context)
-        counter = 0
+        self.counter = 0
 
         for object in bpy.data.objects:
 
             if ".00" in object.name:
                 object.select_set(True)
                 bpy.ops.object.delete(use_global=True, confirm=True)
-                counter = counter + 1
+                self.counter = self.counter + 1
 
-        log_action(context, f"Duplicate cleaning complete. ({counter} objects deleted.)")
+        log_action(context, f"Duplicate cleaning complete. ({self.counter} objects deleted.)", level="SUMMARY")
         force_ui_refresh(context)
         return {'FINISHED'}
 
@@ -876,7 +883,7 @@ class OBJECT_OT_CreateSkinFile(bpy.types.Operator):
 
         except Exception as e:
             self.report({'ERROR'}, f"Failed to create .skin file: {e}")
-            log_action(context, f"Error: Failed to create .skin file: {e}")
+            log_action(context, f"Error: Failed to create .skin file: {e}", level="ERROR")
             return {'CANCELLED'}
 
     def invoke(self, context, event) -> None:
@@ -906,14 +913,14 @@ class OBJECT_OT_CreateSkinFile(bpy.types.Operator):
                                 image = linked_node.image
                             else:
                                 print("Base Color is not linked to an image texture.")
-                                log_action(bpy.context, "Base Color is not linked to an image texture.")
+                                log_action(bpy.context, "Base Color is not linked to an image texture.", level="WARNING")
                         else:
                             print("Base Color is not linked.")
-                            log_action(bpy.context, "Base Color is not linked.")
+                            log_action(bpy.context, "Base Color is not linked.", level="WARNING")
                         break
                 else:
                     print("Principled BSDF node not found.")
-                    log_action(bpy.context, "Principled BSDF node not found.")
+                    log_action(bpy.context, "Principled BSDF node not found.", level="WARNING")
         else:
             return object.active_material.name.split("/")[-1][:-4]
         return image.name[:-4]
@@ -959,12 +966,12 @@ class OBJECT_OT_SelectObjectType(bpy.types.Operator):
             except:
                 if object.name not in scene_collection.objects:
                     print(f"WARNING: {object.name} was not selected. It's in a different collection.")
-                    log_action(context, f"WARNING: {object.name} was not selected. It's in a different collection.")
+                    log_action(context, f"{object.name} was not selected. It's in a different collection.", level="WARNING")
                 else:
                     print(f"WARNING: {object.name} was not selected, reason unknown.")
-                    log_action(context, f"WARNING: {object.name} was not selected, reason unknown.")
+                    log_action(context, f"{object.name} was not selected, reason unknown.", level="WARNING")
 
-        log_action(context, f"Object selection complete. ({mesh_counter} meshes, {tag_counter} tags, {cap_counter} caps selected.)")
+        log_action(context, f"Object selection complete. ({mesh_counter} meshes, {tag_counter} tags, {cap_counter} caps selected.)", level="SUMMARY")
         force_ui_refresh(context)
         return {'FINISHED'}
 
@@ -1064,9 +1071,9 @@ class OBJECT_OT_RemoveEmptyVertexGroups(bpy.types.Operator):
                 counter = counter + 1
         except:
             print(f"WARNING: No possible object selected.")
-            log_action(context, f"WARNING: No possible object selected.")
+            log_action(context, f"No possible object selected.", level="WARNING")
 
-        log_action(context, f"Empty vertex group removal complete. ({counter} objects processed.)")
+        log_action(context, f"Empty vertex group removal complete. ({counter} objects processed.)", level="SUMMARY")
         force_ui_refresh(context)
         return {'FINISHED'}
 
@@ -1143,7 +1150,7 @@ class OBJECT_OT_CreateRoot(bpy.types.Operator):
         # Deselect everything
         bpy.ops.object.select_all(action='DESELECT')
 
-        log_action(context, "Scene and Model root created.")
+        log_action(context, "Scene and Model root created.", level="SUMMARY")
         force_ui_refresh(context)
 
         return {'FINISHED'}
@@ -1175,7 +1182,7 @@ class OBJECT_OT_OrigintoGeometry(bpy.types.Operator):
                 counter = counter + 1
 
         print("Origin to Geometry set on all objects.")
-        log_action(context, f"Origin to Geometry set on all objects. ({counter} objects processed.)")
+        log_action(context, f"Origin to Geometry set on all objects. ({counter} objects processed.)", level="SUMMARY")
 
         return {'FINISHED'}
 
@@ -1207,12 +1214,12 @@ class OBJECT_OT_ReplaceObject(bpy.types.Operator):
 
         if object1_name == "" or object2_name == "":
             self.report({'ERROR'}, "Please select both objects")
-            log_action(context, "ERROR: Please select both objects.")
+            log_action(context, "Please select both objects.", level="ERROR")
             return {'CANCELLED'}
 
         if object1_name == object2_name:
             self.report({'ERROR'}, "Cannot replace an object with itself")
-            log_action(context, "ERROR: Cannot replace an object with itself.")
+            log_action(context, "Cannot replace an object with itself.", level="ERROR")
             return {'CANCELLED'}
 
         object1 = bpy.data.objects[object1_name]
@@ -1220,7 +1227,7 @@ class OBJECT_OT_ReplaceObject(bpy.types.Operator):
 
         if not object1 or not object2:
             self.report({'ERROR'}, "Objects not found")
-            log_action(context, "ERROR: Objects not found.")
+            log_action(context, "Objects not found.", level="ERROR")
             return {'CANCELLED'}
 
         if action == 'DELETE':
@@ -1234,8 +1241,8 @@ class OBJECT_OT_ReplaceObject(bpy.types.Operator):
             self.copy_parenting(object1, object2)
 
             old_name = object1.name
-            log_action(context, f"Object 1 old name: {old_name}")
-            log_action(context, f"Object 2 old name: {object2.name}")
+            log_action(context, f"Object 1 old name: {old_name}", level="INFO")
+            log_action(context, f"Object 2 old name: {object2.name}", level="INFO")
             object1.name = f"replaced_{old_name}"
             object2.name = old_name           # rename Object 2
             log_action(context, f"Object 2 new name: {object2.name}")
@@ -1254,7 +1261,7 @@ class OBJECT_OT_ReplaceObject(bpy.types.Operator):
 
 
         self.report({'INFO'}, f"Replaced {object1_name} with {object2_name}")
-        log_action(context, f"Replaced {object1_name} with {object2_name} using action: {action}")
+        log_action(context, f"Replaced {object1_name} with {object2_name} using action: {action}", level="SUMMARY")
         force_ui_refresh(context)
         return {'FINISHED'}
 
