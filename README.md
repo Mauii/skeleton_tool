@@ -1,10 +1,10 @@
-# Skeleton Tool Add-on (Blender 4.5)
+# Skeleton Tool Add-on (Blender 5.2)
 
 A Blender add-on that accelerates preparing models for Jedi Knight: Jedi Academy. It ships with helpers to set Ghoul2 properties, parent tags/caps, clean duplicates, export `.skin` definitions, and keep replaces synchronized without breaking world transforms.
 
 ## Compatibility
-- Tested with Blender 4.5+.
-- Add-on version **4.5.0** reflects the Blender version it targets and contains safeguards against `ReferenceError` leaks when dangling objects disappear.
+- Tested with Blender 5.2
+- Not tested with Blender 4.5 or lower, feel free to give it a try.
 
 ## Installation
 1. Copy the `skeleton_tool` folder into `Blender/<version>/scripts/addons/`.
