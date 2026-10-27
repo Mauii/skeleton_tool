@@ -1,7 +1,7 @@
 bl_info = {
     "name": "Skeleton Tool",
     "author": "Maui",
-    "version": (3, 6),
+    "version": (3, 7, 0),
     "blender": (5, 2, 0),
     "location": "Press N - Select Skeleton tool",
     "description": "This addon has many features that decrease time wasted when preparing a model for JKA.",
@@ -57,7 +57,10 @@ def import_package_from_file(filename, package_name=None):
     
     return module
 
-import_package_from_file("JAG2Panels.py")
+ja_tools_package = import_package_from_file("JAG2Panels.py")
+if ja_tools_package is not None:
+    from . import operators as _operators
+    _operators.JAG2Panels = ja_tools_package.JAG2Panels
 
 def register():
     register_properties()    # Register properties first

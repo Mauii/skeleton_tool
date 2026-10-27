@@ -6,6 +6,8 @@ import json
 import os
 import re
 
+JAG2Panels = None
+
 # Parent mapping
 parents_dict = {
     "head": "torso",
@@ -19,6 +21,9 @@ parents_dict = {
     "r_leg": "hips"
 }
 parent_all = False
+PARENT_SCALE_RECOVERY_THRESHOLD_METERS = 10.0
+PARENT_SCALE_RECOVERY_FACTOR = 10.0
+PARENT_SCALE_RECOVERY_TOLERANCE = 0.5
 
 ############################################################################################
 # UI refresh helper
@@ -188,6 +193,8 @@ class OBJECT_OT_CreateTags(bpy.types.Operator):
         object.g2_prop.shader = ""  # pyright: ignore [reportAttributeAccessIssue]
         object.g2_prop.off = False  # pyright: ignore [reportAttributeAccessIssue]
         object.g2_prop.tag = True   # pyright: ignore [reportAttributeAccessIssue]
+        if JAG2Panels is not None:
+            JAG2Panels.markG2Configured(object)
 
         return object
 
@@ -212,121 +219,159 @@ class OBJECT_OT_CreateTags(bpy.types.Operator):
 ##                                                                                            ##
 ################################################################################################
 
-class OBJECT_OT_TagParent(bpy.types.Operator):
-    """
-    A class that parents all tags to their respective parents. (it will ignore some if the parent is not found).
+class ParentingOperator:
+    """Shared execution and transform-preserving parenting behavior."""
 
-    ---------
-    Methods:
-    ---------
-    get_parent(self, object)
-        This takes an object and does a simple algorithm to find a suitable parent.
+    triangulate_meshes = False
+    completion_message = "Parenting complete."
 
-    set_parent(self, child, parent)
-        This takes the child and parent (found with get_parent) object and does the actual parenting.
+    def execute(self, context):
+        if not parent_all:
+            clear_log(context)
 
-    should_skip(self, object)
-        This runs a check if it is a stupidtriangle or a specific reason to skip the current object.
-        If none of these have a reason to skip, it will return False so the main function continues.
-    """
+        processed = 0
+        warnings = 0
+        errors = 0
+
+        context.view_layer.update()
+
+        # A snapshot is needed because the body operator can delete objects.
+        for child in tuple(bpy.data.objects):
+            try:
+                self.recover_parent_scale(context, child)
+
+                if self.should_skip(child):
+                    continue
+
+                if self.triangulate_meshes and child.type == 'MESH':
+                    triangulate(child)
+
+                parent = self.get_parent(child)
+                if parent is None:
+                    warnings += 1
+                    self.log(
+                        context,
+                        "No parent was found for '{child}'.",
+                        child=child.name,
+                        level="WARNING",
+                    )
+                    continue
+
+                self.set_parent(context, child, parent)
+                processed += 1
+            except Exception as error:
+                errors += 1
+                self.log(
+                    context,
+                    "{} failed: {}",
+                    child.name,
+                    error,
+                    level="ERROR",
+                )
+
+        self.log(
+            context,
+            "{} ({processed} objects, {warnings} warnings, {errors} errors)",
+            self.completion_message,
+            processed=processed,
+            warnings=warnings,
+            errors=errors,
+        )
+        force_ui_refresh(context)
+        return {'FINISHED'}
+
+    def recover_parent_scale(self, context, child: bpy.types.Object) -> None:
+        dimensions_meters = max(abs(value) for value in child.dimensions)
+        dimensions_meters *= context.scene.unit_settings.scale_length
+        scale_components = tuple(abs(value) for value in child.scale)
+        expected_scale = PARENT_SCALE_RECOVERY_FACTOR
+        tolerance = PARENT_SCALE_RECOVERY_TOLERANCE
+
+        if dimensions_meters <= PARENT_SCALE_RECOVERY_THRESHOLD_METERS:
+            return
+
+        if not all(
+            expected_scale - tolerance <= component <= expected_scale + tolerance
+            for component in scale_components
+        ):
+            return
+
+        old_scale = tuple(child.scale)
+        child.scale = tuple(
+            component / PARENT_SCALE_RECOVERY_FACTOR
+            for component in child.scale
+        )
+        context.view_layer.update()
+        self.log(
+            context,
+            "Recovered likely 10x parent scale on '{child}' "
+            "(largest dimension {dimension:.2f} m, scale {old_scale} -> {new_scale}).",
+            child=child.name,
+            dimension=dimensions_meters,
+            old_scale=old_scale,
+            new_scale=tuple(child.scale),
+            level="WARNING",
+        )
+
+    def log(self, context, template, *args, level="INFO", **kwargs):
+        """Format positional or named message values before logging."""
+        log_action(context, template.format(*args, **kwargs), level=level)
+
+    def get_parent(self, child: bpy.types.Object) -> bpy.types.Object | None:
+        raise NotImplementedError(
+            f"{type(self).__name__} must define a parent rule for {child.name!r}."
+        )
+
+    def should_skip(self, child: bpy.types.Object) -> bool:
+        raise NotImplementedError(
+            f"{type(self).__name__} must define a skip rule for {child.name!r}."
+        )
+
+    def set_parent(
+        self,
+        context,
+        child: bpy.types.Object,
+        parent: bpy.types.Object,
+    ) -> None:
+        world_matrix = child.matrix_world.copy()
+        child.parent = parent
+        child.matrix_world = world_matrix
+        self.log(
+            context,
+            "'{child}' parented to '{parent}'.",
+            child=child.name,
+            parent=parent.name,
+        )
+
+
+class OBJECT_OT_TagParent(bpy.types.Operator, ParentingOperator):
+    """Parent tags to their corresponding body objects."""
 
     bl_idname = "parent.tags"
     bl_label = "Parent Tags"
     bl_description = "Parent all tags to their respective parents."
+    completion_message = "Tag parenting complete."
 
     def execute(self, context):
-        global parent_all
-        if not parent_all:
-            clear_log(context)
+        return ParentingOperator.execute(self, context)
 
-        counter = 0
-        warnings = 0
-        errors = 0
+    def get_parent(self, child: bpy.types.Object) -> bpy.types.Object | None:
+        name_parts = child.name[1:].split('_')
+        if not name_parts or not name_parts[-1]:
+            return None
 
-        for object in bpy.data.objects:
+        base = name_parts[0]
+        lod = name_parts[-1]
+        if base in {'l', 'r'}:
+            if len(name_parts) < 3:
+                return None
+            parent_name = f"{base}_{name_parts[1]}_{lod}"
+        elif base in {'hips', 'head'}:
+            parent_name = f"{base}_{lod}"
+        else:
+            parent_name = f"torso_{lod}"
 
-            if self.should_skip(object):
-                continue
-
-            parent_name = self.get_parent(object)
-            parent_object = bpy.data.objects.get(parent_name)
-
-            try:
-                # Check if the returned 'parent' actually exists
-                if bpy.data.objects.get(parent_name):
-                    self.set_parent(object, parent_object)
-                    counter += 1
-                else:
-                    warnings += 1
-                    print(f"Warning: Parent '{parent_name}' for tag '{object.name}' not found.")
-                    log_action(context, f"Parent '{parent_name}' for tag '{object.name}' not found.")
-
-            except:
-                errors += 1
-                print(f"ERROR: {object.name} caused an unknown issue.")
-                log_action(context, f"An unknown issue occurred while processing tag '{object.name}'.", level="ERROR")
-
-        if warnings > 0:
-            log_action(context, f"{warnings} warnings occurred during tag parenting. Try fixing the G2 properties, then try again.", level="INFO")
-        if errors > 0:
-            log_action(context, f"{errors} errors occurred during tag parenting. Try fixing the G2 properties, then try again.", level="INFO")
-
-        log_action(context, f"Tag parenting complete. ({counter} objects processed, {warnings} warnings, {errors} errors.)", level="INFO")
-
-        force_ui_refresh(context)
-        return {'FINISHED'}
-
-    def get_parent(self, object: bpy.types.Object) -> bpy.types.Object:
-        if not isinstance(object, bpy.types.Object):
-            raise TypeError(f"{object.name} must be an Object.")
-
-        try:
-            name_parts = object.name[1:].split('_')
-            base = name_parts[0]
-            lod = name_parts[-1]
-
-            # left check
-            if base in 'l':
-                return f"l_{name_parts[1]}_{lod}"
-
-            # right check
-            if base in 'r':
-                return f"r_{name_parts[1]}_{lod}"
-
-            # hips check
-            if base in "hips":
-                return f"hips_{lod}"
-
-            #head check
-            if base in "head":
-                return f"head_{lod}"
-
-            # fallback to torso
-            return f"torso_{lod}"
-        except:
-            log_action(context, f"WARNING: {object.name} caused an unknown problem.", level="WARNING")
-
-    def set_parent(self, child: bpy.types.Object, parent: bpy.types.Object) -> None:
-        if not isinstance(child, bpy.types.Object):
-            raise TypeError(f"{child.name} must be an Object.")
-
-        if not isinstance(parent, bpy.types.Object):
-            raise TypeError(f"{parent.name} must be an Object.")
-
-        try:
-            # Copy the world matrix
-            matrixcopy = child.matrix_world.copy()
-
-            # Set the parent
-            child.parent = parent
-
-            # Restore the world transform
-            child.matrix_world = matrixcopy
-
-            print(f"{child.name} parented to {parent.name}")
-            log_action(bpy.context, f"{child.name} parented to {parent.name}", level="INFO")
-        except:
-            log_action(bpy.context, f"Warning: unknown issue occurred while parenting {child.name} to {parent.name}", level="ERROR")
+        return bpy.data.objects.get(parent_name)
 
     def should_skip(self, object: bpy.types.Object) -> bool:
         if not isinstance(object, bpy.types.Object):
@@ -344,126 +389,45 @@ class OBJECT_OT_TagParent(bpy.types.Operator):
 ##                                                                                            ##
 ################################################################################################
 
-class OBJECT_OT_BodyParent(bpy.types.Operator):
-    """
-    A class that parents all objects to their respective parents. (it will ignore some if the parent is not found).
-    Also, it will check if the objects have non-triangulated faces and apply triangulate if needed.
-
-    ---------
-    Methods:
-    ---------
-    get_parent(self, object)
-        This takes an object and does a simple algorithm to find a suitable parent.
-
-    set_parent(self, child, parent)
-        This takes the child and parent (found with get_parent) object and does the actual parenting.
-
-    should_skip(self, object)
-        This runs a check if it is a stupidtriangle or a specific reason to skip the current object.
-        If none of these have a reason to skip, it will return False so the main function continues.
-    """
+class OBJECT_OT_BodyParent(bpy.types.Operator, ParentingOperator):
+    """Parent regular model objects to their corresponding body objects."""
 
     bl_idname = "parent.objects"
     bl_label = "Parent Objects"
     bl_description = "Parent all objects to their respective parents and apply triangulate if needed."
+    triangulate_meshes = True
+    completion_message = "Body parenting complete."
 
     def execute(self, context):
-          # Clears the console (Windows only)
-        global parent_all
-        if not parent_all:
-            clear_log(context)
+        return ParentingOperator.execute(self, context)
 
-        counter = 0
-        warnings = 0
-        errors = 0
-
-        for object in bpy.data.objects:
-            if self.should_skip(object):
-                continue
-
-            if object.type == 'MESH':
-                triangulate(object)
-
-            try:
-                parent_object = self.get_parent(object)
-
-                if parent_object:
-                    self.set_parent(object, parent_object)
-                    counter += 1
-                else:
-                    warnings += 1
-                    log_action(context, f"Parent '{parent_object}' not found for {object.name}.", level="WARNING")
-
-            except:
-                print(f"WARNING: {object.name} caused an unknown issue.")
-                log_action(context, f"An unknown issue occurred while processing {object.name}.", level="ERROR")
-                errors += 1
-
-        if warnings > 0:
-            log_action(context, f"{warnings} warnings occurred during CAP parenting. Try fixing the G2 properties, then try again.", level="INFO")
-
-        if errors > 0:
-            log_action(context, f"{errors} errors occurred during CAP parenting. Try fixing the G2 properties, then try again.", level="INFO")
-
-        log_action(context, f"Parenting complete. ({counter} objects processed, {warnings} warnings, {errors} errors.)", level="INFO")
-
-        force_ui_refresh(context)
-        return {'FINISHED'}
-
-    def get_parent(self, child: bpy.types.Object) -> bpy.types.Object:
-        if not isinstance(child, bpy.types.Object):
-            raise TypeError(f"{child.name} must be an Object.")
-
+    def get_parent(self, child: bpy.types.Object) -> bpy.types.Object | None:
         name_parts = child.name.split("_")
 
-        try:
-            # Root objects
-            if "skeleton_root" in child.name or "model_root" in child.name:
-                return bpy.data.objects.get("scene_root")
+        if "skeleton_root" in child.name or "model_root" in child.name:
+            return bpy.data.objects.get("scene_root")
 
-            # Numeric index in second part of name
-            elif len(name_parts) > 1 and name_parts[1].isnumeric():
-                parent_key = child.name[:-2]
-                return bpy.data.objects.get(f"{parents_dict[parent_key]}_{child.name[-1]}")
-
-            # Left or right
-            elif child.name.startswith(("l_", "r_")):
-                if len(name_parts) > 3:  # extra piece
-                    return bpy.data.objects.get(f"{name_parts[0]}_{name_parts[1]}_{child.name[-1]}")
-
-                else:
-                    parent_key = child.name[:-2]
-                    return bpy.data.objects.get(f"{parents_dict[parent_key]}_{child.name[-1]}")
-
-            # Fallback: use first part of name
+        if len(name_parts) > 1 and name_parts[1].isnumeric():
+            parent_key = child.name[:-2]
+            parent_type = parents_dict.get(parent_key)
+            if parent_type is None:
+                return None
+            parent_name = f"{parent_type}_{child.name[-1]}"
+        elif child.name.startswith(("l_", "r_")):
+            if len(name_parts) > 3:
+                parent_name = (
+                    f"{name_parts[0]}_{name_parts[1]}_{child.name[-1]}"
+                )
             else:
-                return bpy.data.objects.get(f"{name_parts[0]}_{child.name[-1]}")
-        except:
-            print(f"WARNING: {child.name} could not be parented, missing parent object?")
-            log_action(context, f"{child.name} could not be parented, missing parent object?", level="WARNING")
+                parent_key = child.name[:-2]
+                parent_type = parents_dict.get(parent_key)
+                if parent_type is None:
+                    return None
+                parent_name = f"{parent_type}_{child.name[-1]}"
+        else:
+            parent_name = f"{name_parts[0]}_{child.name[-1]}"
 
-    def set_parent(self, child: bpy.types.Object, parent: bpy.types.Object) -> None:
-        if not isinstance(child, bpy.types.Object):
-            raise TypeError(f"{child.name} must be an Object.")
-
-        if not isinstance(parent, bpy.types.Object):
-            raise TypeError(f"{parent.name} must be an Object.")
-
-        try:
-            # Copy the world matrix
-            matrixcopy = child.matrix_world.copy()
-
-            # Set the parent
-            child.parent = parent
-
-            # Restore the world transform
-            child.matrix_world = matrixcopy
-
-            print(f"{child.name} parented to {parent.name}")
-
-        except:
-            print("Something went wrong with parenting {child.name} to {parent.name}")
-            log_action(bpy.context, f"Something went wrong with parenting {child.name} to {parent.name}", level="ERROR")
+        return bpy.data.objects.get(parent_name)
 
     def should_skip(self, object: bpy.types.Object) -> bool:
         if not isinstance(object, bpy.types.Object):
@@ -471,8 +435,7 @@ class OBJECT_OT_BodyParent(bpy.types.Operator):
 
         if "stupidtriangle" in object.name:
             print(f"{object.name} deleted.")
-            object.select_set(True)
-            bpy.ops.object.delete(use_global=True, confirm=True)
+            bpy.data.objects.remove(object, do_unlink=True)
             return True
 
         if object.g2_prop.tag or object.name == "scene_root" or ("_cap_" in object.name and "_off" in object.name[:-2]) or object.name.startswith("*"):
@@ -487,113 +450,35 @@ class OBJECT_OT_BodyParent(bpy.types.Operator):
 ##                                                                                            ##
 ################################################################################################
 
-class OBJECT_OT_CapParent(bpy.types.Operator):
-    """
-    A class that parents all caps to their respective parents. (it will ignore some if the parent is not found).
-    Also, it will check if the caps have non-triangulated faces and apply triangulate if needed.
-
-    ---------
-    Methods:
-    ---------
-    get_parent(self, object)
-        This takes an object and does a simple algorithm to find a suitable parent.
-
-    set_parent(self, child, parent)
-        This takes the child and parent (found with get_parent) object and does the actual parenting.
-
-    should_skip(self, object)
-        This runs a check if it is a stupidtriangle or a specific reason to skip the current object.
-        If none of these have a reason to skip, it will return False so the main function continues.
-    """
+class OBJECT_OT_CapParent(bpy.types.Operator, ParentingOperator):
+    """Parent cap meshes to their corresponding body objects."""
 
     bl_idname = "parent.caps"
     bl_label = "Parent Caps"
     bl_description = "Parent all caps to their respective parents and apply triangulate if needed."
+    triangulate_meshes = True
+    completion_message = "Cap parenting complete."
 
     def execute(self, context):
-        global parent_all
-        
-        if not parent_all:
-            clear_log(context)
+        return ParentingOperator.execute(self, context)
 
-        counter = 0
-        warnings = 0
-        errors = 0
-        for object in bpy.data.objects:
-            try:
-                if self.should_skip(object):
-                    continue
-
-                if object.type == 'MESH':
-                    triangulate(object)
-
-                    parent_object = self.get_parent(object)
-
-                    if parent_object:
-                        self.set_parent(object, parent_object)
-                        counter += 1
-                    else:
-                        warnings += 1
-                        log_action(bpy.context, f"{parent_object.name} not found for {object.name}.", level="WARNING")
-
-            except:
-                errors += 1
-                print(f"ERROR: unknown issue occurred with {object.name}")
-                log_action(bpy.context, f"An unknown issue occurred while processing {object.name}.", level="ERROR")
-
-
-        log_action(bpy.context, f"CAP Parenting complete. ({counter} objects processed. {warnings} warnings, {errors} errors)", level="INFO")
-
-        if warnings > 0:
-            log_action(bpy.context, f"{warnings} warnings occurred during CAP parenting.", level="INFO")
-
-        if errors > 0:
-            log_action(bpy.context, f"{errors} errors occurred during CAP parenting. Try fixing the G2 properties, then try again.", level="INFO")
-
-        force_ui_refresh(context)
-        return {'FINISHED'}
-
-    def get_parent(self, child: bpy.types.Object) -> bpy.types.Object:
-        if not isinstance(child, bpy.types.Object):
-            raise TypeError(f"{child.name} must be an Object.")
-        # Split the object name into parts
+    def get_parent(self, child: bpy.types.Object) -> bpy.types.Object | None:
         name_parts = child.name.split("_")
-
-        # Handle cases like l_arm_cap_0
         if name_parts[0] in {"l", "r"}:
-            return bpy.data.objects.get(f"{name_parts[0]}_{name_parts[1]}_{name_parts[-1]}")
+            if len(name_parts) < 4:
+                return None
+            parent_name = f"{name_parts[0]}_{name_parts[1]}_{name_parts[-1]}"
+        else:
+            parent_name = f"{name_parts[0]}_{name_parts[-1]}"
 
-        # Handle cases like torso_cap_0
-        return bpy.data.objects.get(f"{name_parts[0]}_{name_parts[-1]}")
-
-    def set_parent(self, child: bpy.types.Object, parent: bpy.types.Object) -> None:
-        if not isinstance(child, bpy.types.Object):
-            raise TypeError(f"{child.name} must be an Object.")
-
-        if not isinstance(parent, bpy.types.Object):
-            raise TypeError(f"{parent.name} must be an Object.")
-
-        try:
-            # Copy the world matrix
-            matrixcopy = child.matrix_world.copy()
-            # Set the parent
-            child.parent = parent
-            # Restore the world transform
-            child.matrix_world = matrixcopy
-            print(f"{child.name} parented to {parent.name}")
-
-        except:
-            print("Something went wrong with parenting {child.name} to {parent.name}")
-            log_action(bpy.context, f"Something went wrong with parenting {child.name} to {parent.name}", level="ERROR")
+        return bpy.data.objects.get(parent_name)
 
     def should_skip(self, object: bpy.types.Object) -> bool:
-        if not isinstance(object, bpy.types.Object):
-            raise TypeError(f"{object.name} must be an Object.")
-
-        if "_cap_" not in object.name or object.g2_prop.tag:
-            return True
-
-        return False
+        return (
+            object.type != 'MESH'
+            or "_cap_" not in object.name
+            or object.g2_prop.tag
+        )
 
 
 ################################################################################################
@@ -612,10 +497,14 @@ class OBJECT_OT_AllParent(bpy.types.Operator):
         global parent_all
         parent_all = True
         clear_log(context)
-        bpy.ops.parent.objects()
-        bpy.ops.parent.tags()
-        bpy.ops.parent.caps()
-        parent_all = False
+
+        try:
+            bpy.ops.parent.objects()
+            bpy.ops.parent.tags()
+            bpy.ops.parent.caps()
+        finally:
+            parent_all = False
+
         log_action(context, "All parenting operations complete.", level="INFO")
         return {'FINISHED'}
 
@@ -720,6 +609,9 @@ class OBJECT_OT_SetG2Properties(bpy.types.Operator):
                 self.meshes_fixed = True
             if self.meshes_fixed:
                 self.meshes_counter += 1
+
+        if JAG2Panels is not None:
+            JAG2Panels.markG2Configured(object)
 
     def should_skip(self, object: bpy.types.Object) -> bool:
         if not isinstance(object, bpy.types.Object):
