@@ -26,3 +26,6 @@ A Blender add-on that accelerates preparing models for Jedi Knight: Jedi Academy
 
 ## Contribution
 Feel free to open issues or pull requests on the [GitHub repository](https://github.com/Mauii/skeleton_tool/) if you find regressions with Blender releases newer than 4.5.
+
+## Extra note
+I used Copilot's agent in helping with certain refactors which otherwise might be taking too long to figure out myself. This goes only for the parenting section of the addon and executing a fine release.
