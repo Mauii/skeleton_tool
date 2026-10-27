@@ -8,8 +8,9 @@ A Blender add-on that accelerates preparing models for Jedi Knight: Jedi Academy
 
 ## Installation
 1. Copy the `skeleton_tool` folder into `Blender/<version>/scripts/addons/`.
-2. Enable the add-on from **Edit > Preferences > Add-ons** by searching for _Skeleton Tool_.
-3. Press `N` in the 3D Viewport and open the *Skeleton Tool* panel under the sidebar.
+2. Add a copy of a _humanoid.gla inside the addon's folder
+3. Enable the add-on from **Edit > Preferences > Add-ons** by searching for _Skeleton Tool_.
+4. Press `N` in the 3D Viewport and open the *Skeleton Tool* panel under the sidebar.
 
 ## Features
 - Batch parenting/tagging for meshes, caps, and tags with automatic triangle cleanup and triangulation safeguards.
